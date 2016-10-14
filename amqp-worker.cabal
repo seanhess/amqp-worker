@@ -42,6 +42,7 @@ test-suite test
   main-is:             Spec.hs
   build-depends:
       base
+    , bytestring
     , aeson
     , amqp
     , amqp-worker

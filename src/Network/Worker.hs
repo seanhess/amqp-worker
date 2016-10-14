@@ -5,7 +5,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 module Network.Worker
   ( AMQP.fromURI
-  , worker
   , publish
   , publishToExchange
   , connect
@@ -15,6 +14,9 @@ module Network.Worker
   , topicQueue
   , initQueue
   , withChannel
+  , consume
+  , waitAndConsume
+  , worker
   , RoutingKey(..)
   , BindingKey(..)
   , BindingName(..)
@@ -106,7 +108,7 @@ type ExchangeName = Text
 
 exchange :: Text -> Exchange
 exchange nm =
-  Exchange $ AMQP.newExchange { exchangeName = nm, exchangeType = "direct" }
+  Exchange $ AMQP.newExchange { exchangeName = nm, exchangeType = "topic" }
 
 
 topicQueue :: Exchange -> BindingKey -> Queue Topic msg
@@ -147,7 +149,7 @@ message a = newMsg
 publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> RoutingKey -> a -> m ()
 publishToExchange conn exg (RoutingKey rk) msg =
   withChannel conn $ \chan -> do
-    liftBase $ print (exg, rk, (message msg))
+    liftBase $ print (exg, rk, message msg)
     _ <- liftBase $ AMQP.publishMsg chan exg rk (message msg)
     return ()
 
@@ -159,6 +161,7 @@ publish conn (Queue (Exchange exg) key _) msg =
 
 
 -- TODO I need to surface parse errors, rather than acknowledging them and swallowing.
+-- don't throw an error. Much easier to know what's going on.
 consume :: (FromJSON msg, MonadBaseControl IO m, MonadThrow m) => Connection -> Queue key msg -> m (Maybe msg)
 consume conn (Queue exg _ options) = do
   mme <- withChannel conn $ \chan ->
@@ -169,9 +172,8 @@ consume conn (Queue exg _ options) = do
     Just (msg, env) -> do
       liftBase $ AMQP.ackEnv env
       case Aeson.eitherDecode (msgBody msg) of
-        Left err -> do
+        Left err ->
           throwM $ ParseError err
-          return Nothing
 
         Right m ->
           return $ Just m
@@ -282,21 +284,13 @@ withChannel conn action =
 -- routingkeys, just specify by hand
 
 
-initExchange :: Connection -> Exchange -> IO ()
-initExchange conn (Exchange options) =
-  withChannel conn $ \chan ->
-    AMQP.declareExchange chan options
-
--- so this needs
-initQueue :: (Show key) => Connection -> Queue key msg -> IO ()
+initQueue :: (QueueKey key) => Connection -> Queue key msg -> IO ()
 initQueue conn (Queue (Exchange exg) key options) =
   withChannel conn $ \chan -> do
-    initExchange conn (Exchange exg)
+    _ <- AMQP.declareExchange chan exg
     _ <- AMQP.declareQueue chan options
-    _ <- AMQP.bindQueue chan (AMQP.queueName options) (AMQP.exchangeName exg) (Text.pack . show $ key)
+    _ <- AMQP.bindQueue chan (AMQP.queueName options) (AMQP.exchangeName exg) (showKey key)
     return ()
-  where
-    name = AMQP.queueName options
 
 
 
