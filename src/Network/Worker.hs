@@ -28,7 +28,7 @@ module Network.Worker
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException(..))
-import Control.Monad.Catch (throwM, MonadThrow, Exception(..), catch, MonadCatch)
+import Control.Monad.Catch (Exception(..), catch, MonadCatch)
 import Control.Monad (forever)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
@@ -36,7 +36,6 @@ import Data.ByteString.Lazy (ByteString)
 import Data.String (IsString(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
-import Data.Typeable (Typeable)
 import Data.Pool (Pool)
 import qualified Data.Pool as Pool
 import qualified Data.List as List
@@ -44,7 +43,6 @@ import qualified Data.List.Split as List
 -- import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Network.AMQP as AMQP
 import Network.AMQP (Channel, newMsg, DeliveryMode(..), ExchangeOpts(..), QueueOpts(..), Ack(..))
-import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Base (liftBase)
 
@@ -157,31 +155,20 @@ publishToExchange conn exg (RoutingKey rk) msg =
 
 -- you can only publish to a direct queue
 publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Queue Direct msg -> msg -> m ()
-publish conn (Queue (Exchange exg) key _) msg =
-  publishToExchange conn (AMQP.exchangeName exg) key msg
+publish conn (Queue (Exchange exg) key _) =
+  publishToExchange conn (AMQP.exchangeName exg) key
 
 
--- I only care about the body and the stuff...
--- why do I have to care about the stupid body?
--- I don't! If I produce the real message you can serialize it
 newtype Message a =
   Message (Either ParseError a)
-
--- I wish it could just be Message a!
--- basically I'm forcing anyone who uses this to handle invalid input. Is that what I want to do?
 
 data ParseError =
   ParseError String ByteString
   deriving (Show, Eq)
 
 
--- has a body
--- either an error or a message
-
--- TODO I need to surface parse errors, rather than acknowledging them and swallowing.
--- don't throw an error. Much easier to know what's going on.
 consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (Message msg))
-consume conn (Queue exg _ options) = do
+consume conn (Queue _ _ options) = do
   mme <- withChannel conn $ \chan ->
     liftBase $ AMQP.getMsg chan Ack (queueName options)
 
@@ -202,7 +189,7 @@ consume conn (Queue exg _ options) = do
 
 
 consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Message msg)
-consumeNext conn queue = do
+consumeNext conn queue =
     poll pollDelay $ consume conn queue
 
   where
@@ -274,8 +261,8 @@ connect opts =
       AMQP.closeConnection conn
 
 disconnect :: Connection -> IO ()
-disconnect conn =
-    Pool.destroyAllResources conn
+disconnect =
+    Pool.destroyAllResources
 
 
 
