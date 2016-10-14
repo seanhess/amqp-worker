@@ -1,3 +1,8 @@
+AMQP Worker
+-----------
+
+Type-safe AMQP workers. Compatible with RabbitMQ
+
     {-# LANGUAGE OverloadedStrings #-}
     {-# LANGUAGE DeriveGeneric #-}
     module Main where
