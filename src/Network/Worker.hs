@@ -15,7 +15,7 @@ module Network.Worker
   , initQueue
   , withChannel
   , consume
-  , waitAndConsume
+  , consumeNext
   , worker
   , RoutingKey(..)
   , BindingKey(..)
@@ -23,14 +23,16 @@ module Network.Worker
   , Exchange(..)
   , Queue(..)
   , Direct, Topic
+  , WorkerException(..)
   ) where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException(..))
-import Control.Monad.Catch (throwM, MonadThrow, Exception(..))
+import Control.Monad.Catch (throwM, MonadThrow, Exception(..), catch, MonadCatch)
 import Control.Monad (forever)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
+import Data.ByteString.Lazy (ByteString)
 import Data.String (IsString(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -41,7 +43,7 @@ import qualified Data.List as List
 import qualified Data.List.Split as List
 -- import qualified Data.ByteString.Lazy.Char8 as BL
 import qualified Network.AMQP as AMQP
-import Network.AMQP (Message(..), Channel, newMsg, DeliveryMode(..), ExchangeOpts(..), QueueOpts(..), Ack(..))
+import Network.AMQP (Channel, newMsg, DeliveryMode(..), ExchangeOpts(..), QueueOpts(..), Ack(..))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Base (liftBase)
@@ -136,12 +138,12 @@ type Topic = BindingKey
 
 -- publish -----------------------------------------------
 
-message :: ToJSON a => a -> Message
-message a = newMsg
-  { msgBody = Aeson.encode a
-  , msgContentType = Just "application/json"
-  , msgContentEncoding = Just "UTF-8"
-  , msgDeliveryMode = Just Persistent
+jsonMessage :: ToJSON a => a -> AMQP.Message
+jsonMessage a = newMsg
+  { AMQP.msgBody = Aeson.encode a
+  , AMQP.msgContentType = Just "application/json"
+  , AMQP.msgContentEncoding = Just "UTF-8"
+  , AMQP.msgDeliveryMode = Just Persistent
   }
 
 
@@ -149,8 +151,7 @@ message a = newMsg
 publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> RoutingKey -> a -> m ()
 publishToExchange conn exg (RoutingKey rk) msg =
   withChannel conn $ \chan -> do
-    liftBase $ print (exg, rk, message msg)
-    _ <- liftBase $ AMQP.publishMsg chan exg rk (message msg)
+    _ <- liftBase $ AMQP.publishMsg chan exg rk (jsonMessage msg)
     return ()
 
 
@@ -160,51 +161,80 @@ publish conn (Queue (Exchange exg) key _) msg =
   publishToExchange conn (AMQP.exchangeName exg) key msg
 
 
+-- I only care about the body and the stuff...
+-- why do I have to care about the stupid body?
+-- I don't! If I produce the real message you can serialize it
+newtype Message a =
+  Message (Either ParseError a)
+
+-- I wish it could just be Message a!
+-- basically I'm forcing anyone who uses this to handle invalid input. Is that what I want to do?
+
+data ParseError =
+  ParseError String ByteString
+  deriving (Show, Eq)
+
+
+-- has a body
+-- either an error or a message
+
 -- TODO I need to surface parse errors, rather than acknowledging them and swallowing.
 -- don't throw an error. Much easier to know what's going on.
-consume :: (FromJSON msg, MonadBaseControl IO m, MonadThrow m) => Connection -> Queue key msg -> m (Maybe msg)
+consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (Message msg))
 consume conn (Queue exg _ options) = do
   mme <- withChannel conn $ \chan ->
     liftBase $ AMQP.getMsg chan Ack (queueName options)
 
   case mme of
-    Nothing -> return Nothing
+    Nothing ->
+      return Nothing
+
     Just (msg, env) -> do
       liftBase $ AMQP.ackEnv env
-      case Aeson.eitherDecode (msgBody msg) of
+      let body = AMQP.msgBody msg
+      case Aeson.eitherDecode body of
         Left err ->
-          throwM $ ParseError err
+          return $ Just $ Message (Left $ ParseError err body)
 
         Right m ->
-          return $ Just m
+          return $ Just $ Message (Right m)
 
 
 
-waitAndConsume :: (FromJSON msg, MonadBaseControl IO m, MonadThrow m) => Connection -> Queue key msg -> (msg -> m ()) -> m ()
-waitAndConsume conn queue action = do
-    m <- poll pollDelay $ consume conn queue
-    action m
+consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Message msg)
+consumeNext conn queue = do
+    poll pollDelay $ consume conn queue
 
   where
     pollDelay = 1 * 1000
 
 
 
-worker :: (FromJSON msg, MonadBaseControl IO m, MonadThrow m) => Connection -> Queue key msg -> (msg -> m ()) -> m ()
-worker conn queue action =
-  forever $ waitAndConsume conn queue action
+worker :: (FromJSON a, ToJSON a, MonadBaseControl IO m, MonadCatch m) => Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (a -> m ()) -> m ()
+worker conn queue onError action =
+  forever $ do
+    Message msg <- consumeNext conn queue
+    case msg of
+      Left (ParseError reason body) ->
+        onError body (MessageParseError reason)
+
+      Right m ->
+        catch
+          (action m)
+          (onError (Aeson.encode m) . OtherException)
+
+data WorkerException e
+  = MessageParseError String
+  | OtherException e
+  deriving (Show, Eq)
+
+instance (Exception e) => Exception (WorkerException e)
 
 
-data WorkerException
-  = ParseError String
-  deriving (Show, Typeable)
-
-instance Exception WorkerException
 
 
 
-
-
+-- helpers ---------------------------------------------------
 
 poll :: (MonadBaseControl IO m) => Int -> m (Maybe a) -> m a
 poll us action = do
@@ -257,33 +287,6 @@ withChannel conn action =
       action chan
 
 
-
--- takes a function that takes it as it's main argument?
--- worker :: (a -> m ()) -> m ()
-
--- myWorker :: IO ()
--- myWorker = do
---     conn <- connect (fromURI "amqp://localhost:5672")
---
---     -- publish conn (Destination "woot" "asdf.routing") "Hello"
---   where
---     exchange = j
-
-
--- 1. Declare Exchange: name, topic
--- 2. Declare Queue: name?,
--- 3. Bind Queue: exchange, routing key, queue
-
--- good defaults: Persistent, Durable, queues don't need a name
-
-
--- exchange: name
--- queue: exchange, routing key
-
-
--- routingkeys, just specify by hand
-
-
 initQueue :: (QueueKey key) => Connection -> Queue key msg -> IO ()
 initQueue conn (Queue (Exchange exg) key options) =
   withChannel conn $ \chan -> do
@@ -291,57 +294,3 @@ initQueue conn (Queue (Exchange exg) key options) =
     _ <- AMQP.declareQueue chan options
     _ <- AMQP.bindQueue chan (AMQP.queueName options) (AMQP.exchangeName exg) (showKey key)
     return ()
-
-
-
-
--- you have to remember to give binding keys vs routing keys for when you send?
--- bah
--- what if I remove decisions? good defaults
--- default: topic queue
--- default: binding key = routing key
--- exchange and connection all rolled up
--- read from a different queue than you publish to
-
--- publish to a queue:
-
-
-
-
-
--- test :: IO ()
--- test = do
---     conn <- openConnection "127.0.0.1" "/" "guest" "guest"
---     chan <- openChannel conn
---
---     -- declare a queue, exchange and binding
---     (_, _, _) <- declareQueue chan newQueue { queueName = "myQueue" }
---     declareExchange chan newExchange { exchangeName = "myExchange", exchangeType = "direct" }
---     bindQueue chan "myQueue" "myExchange" "myKey"
---
---     -- subscribe to the queue
---     _ <- consumeMsgs chan "myQueue" NoAck myCallback
---
---     -- publish a message to our new exchange
---     _ <- publishMsg chan "myExchange" "myKey"
---       newMsg
---         { msgBody = BL.pack "hello world"
---         , msgDeliveryMode = Just Persistent
---         }
---
---     _ <- publishMsg chan "myExchange" "myKey"
---       newMsg
---         { msgBody = BL.pack "hello world 2 "
---         , msgDeliveryMode = Just Persistent
---         }
---
---     _ <- getLine -- wait for keypress
---     closeConnection conn
---     putStrLn "connection closed"
---
--- myCallback :: (Message, Envelope) -> IO ()
--- myCallback (msg, env) = do
---     putStrLn "received message"
---     print $ msgBody msg
---     -- acknowledge receiving the message
---     ackEnv env

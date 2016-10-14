@@ -4,12 +4,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Main where
 
+import Control.Exception (SomeException(..))
+import Control.Monad.Catch (Exception, throwM, catch)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import qualified Network.Worker as Worker
-import Network.Worker (fromURI, Exchange, Queue, Direct)
+import Network.Worker (fromURI, Exchange, Queue, Direct, WorkerException(..))
 
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Network.AMQP (publishMsg, ExchangeOpts(..), QueueOpts(..), openConnection, openChannel, Message(..), declareQueue, declareExchange, bindQueue, newQueue, newExchange, consumeMsgs, Ack(..), newMsg, closeConnection, DeliveryMode(..))
@@ -37,31 +39,37 @@ main = do
   Worker.initQueue conn queue
   -- Worker.publishToExchange conn "myExchange" "myQueue" (TestMessage "LKJLKJ")
   Worker.publish conn queue (TestMessage "woot")
+  Worker.publish conn queue (TestMessage "woot2")
+  -- Worker.publish conn queue (TestMessage "woot3")
+  -- Worker.publish conn queue (TestMessage "woot4")
+  -- Worker.publish conn queue (TestMessage "woot5")
 
-  m <- Worker.consume conn queue
-  m1 <- Worker.consume conn queue
-  m2 <- Worker.consume conn queue
-  m3 <- Worker.consume conn queue
-  m4 <- Worker.consume conn queue
-  m5 <- Worker.consume conn queue
-  print (m, m1, m2, m3, m4, m5)
-  Worker.waitAndConsume conn queue $ \m6 -> do
-    print m6
-
-  -- interleaving? Multiple connections?
   -- Worker.withChannel conn $ \chan ->
-  --   publishMsg chan "myExchange" "myQueue"
+  --   publishMsg chan "testExchange" "testQueue"
   --       newMsg {msgBody = (BL.pack "hello world"),
   --               msgDeliveryMode = Just Persistent}
 
-  -- -- Worker.publish conn queue (TestMessage "henry")
-  -- -- Worker.publish conn queue (TestMessage "fat")
-  -- Worker.disconnect conn
-  -- -- I need to close the connection, or it won't send
-  asdf <- getLine
-  -- Worker.disconnect conn
-  -- print conn
-  putStrLn "HELLO"
+  Worker.worker conn queue onError work
+
+  where
+    work :: TestMessage -> IO ()
+    work msg = do
+      putStrLn ""
+      putStrLn "NEW MESSAGE"
+      print msg
+      -- throwM (Fake "oh no")
+      error "GRLKJ"
+
+    onError :: BL.ByteString -> WorkerException SomeException -> IO ()
+    onError body ex = do
+      putStrLn ""
+      putStrLn "Got an error"
+      print body
+      print ex
+
+
+data Fake = Fake Text deriving (Show, Eq)
+instance Exception Fake
 
 
 woot = do
