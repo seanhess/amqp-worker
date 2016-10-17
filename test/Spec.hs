@@ -4,12 +4,12 @@ module Main where
 
 import Control.Concurrent (forkIO)
 import Data.Aeson (FromJSON, ToJSON)
-import qualified Data.Aeson as Aeson
+-- import qualified Data.Aeson as Aeson
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import qualified Network.Worker as Worker
-import Network.Worker (fromURI, Exchange, Queue, Direct, WorkerException(..))
-import System.IO (hSetBuffering, stdout, stderr, BufferMode(..))
+import Network.Worker (fromURI, Exchange, Queue, Direct)
+-- import System.IO (hSetBuffering, stdout, stderr, BufferMode(..))
 
 data TestMessage = TestMessage
   { greeting :: Text }
@@ -67,7 +67,9 @@ example = do
       print ex
 
 
+main :: IO ()
 main = do
-  hSetBuffering stdout LineBuffering
-  hSetBuffering stderr LineBuffering
-  example
+  -- hSetBuffering stdout LineBuffering
+  -- hSetBuffering stderr LineBuffering
+  -- example
+  return ()
