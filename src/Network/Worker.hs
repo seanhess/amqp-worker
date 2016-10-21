@@ -16,14 +16,18 @@ module Network.Worker
   , withChannel
   , consume
   , consumeNext
-  , worker
   , RoutingKey(..)
   , BindingKey(..)
   , BindingName(..)
   , Exchange(..)
   , Queue(..)
   , Direct, Topic
+  , worker
   , WorkerException(..)
+  , Connection
+  , ConsumeResult(..)
+  , ParseError(..)
+  , Message(..)
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -159,15 +163,21 @@ publish conn (Queue (Exchange exg) key _) =
   publishToExchange conn (AMQP.exchangeName exg) key
 
 
-newtype Message a =
-  Message (Either ParseError a)
-
-data ParseError =
-  ParseError String ByteString
-  deriving (Show, Eq)
+data ConsumeResult a
+  = Parsed (Message a)
+  | Error ParseError
 
 
-consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (Message msg))
+data Message a = Message
+  { body :: ByteString
+  , value :: a
+  } deriving (Show, Eq)
+
+
+data ParseError = ParseError String ByteString
+
+
+consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ _ options) = do
   mme <- withChannel conn $ \chan ->
     liftBase $ AMQP.getMsg chan Ack (queueName options)
@@ -178,17 +188,17 @@ consume conn (Queue _ _ options) = do
 
     Just (msg, env) -> do
       liftBase $ AMQP.ackEnv env
-      let body = AMQP.msgBody msg
-      case Aeson.eitherDecode body of
+      let bd = AMQP.msgBody msg
+      case Aeson.eitherDecode bd of
         Left err ->
-          return $ Just $ Message (Left $ ParseError err body)
+          return $ Just $ Error (ParseError err bd)
 
-        Right m ->
-          return $ Just $ Message (Right m)
+        Right v ->
+          return $ Just $ Parsed (Message bd v)
 
 
 
-consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Message msg)
+consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (ConsumeResult msg)
 consumeNext conn queue =
     poll pollDelay $ consume conn queue
 
@@ -197,18 +207,20 @@ consumeNext conn queue =
 
 
 
-worker :: (FromJSON a, ToJSON a, MonadBaseControl IO m, MonadCatch m) => Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (a -> m ()) -> m ()
+worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
 worker conn queue onError action =
   forever $ do
-    Message msg <- consumeNext conn queue
-    case msg of
-      Left (ParseError reason body) ->
-        onError body (MessageParseError reason)
+    eres <- consumeNext conn queue
+    case eres of
+      Error (ParseError reason bd) ->
+        onError bd (MessageParseError reason)
 
-      Right m ->
+      Parsed msg ->
         catch
-          (action m)
-          (onError (Aeson.encode m) . OtherException)
+          (action msg)
+          (onError (body msg) . OtherException)
+
+
 
 data WorkerException e
   = MessageParseError String
