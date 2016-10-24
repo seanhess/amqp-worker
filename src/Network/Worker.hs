@@ -180,6 +180,7 @@ data Message a = Message
 data ParseError = ParseError String ByteString
 
 
+-- | Check for a message once and attempt to parse it
 consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ _ options) = do
   mme <- withChannel conn $ \chan ->
@@ -201,12 +202,14 @@ consume conn (Queue _ _ options) = do
 
 
 
-consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Int -> Connection -> Queue key msg -> m (ConsumeResult msg)
+-- | Block while checking for messages every N microseconds. Return once you find one.
+consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Microseconds -> Connection -> Queue key msg -> m (ConsumeResult msg)
 consumeNext pd conn queue =
     poll pd $ consume conn queue
 
 
 
+-- | Create a worker which loops, checks for messages, and handles errors
 worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => WorkerOptions -> Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
 worker opts conn queue onError action =
   forever $ do
@@ -221,17 +224,24 @@ worker opts conn queue onError action =
           (onError (body msg) . OtherException)
     liftBase $ threadDelay (loopDelay opts)
 
+
+
+
+-- | Options for worker
 data WorkerOptions = WorkerOptions
-  { pollDelay :: Int
-  , loopDelay :: Int
+  { pollDelay :: Microseconds -- ^ Delay between unsuccessful calls to consume. Defaults to 10ms
+  , loopDelay :: Microseconds -- ^ Delay between successful calls to the job functions. Defaults to 0ms
   } deriving (Show, Eq)
+
+type Microseconds = Int
 
 instance Default WorkerOptions where
   def = WorkerOptions
-    { pollDelay = 1 * 1000
+    { pollDelay = 10 * 1000
     , loopDelay = 0
     }
 
+-- | Exceptions created while processing
 data WorkerException e
   = MessageParseError String
   | OtherException e
