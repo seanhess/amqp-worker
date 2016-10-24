@@ -28,6 +28,7 @@ library
     , amqp
     , bytestring
     , exceptions
+    , data-default
     , monad-control
     , mtl
     , resource-pool

@@ -28,6 +28,8 @@ module Network.Worker
   , ConsumeResult(..)
   , ParseError(..)
   , Message(..)
+  , WorkerOptions(..)
+  , def
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -37,6 +39,7 @@ import Control.Monad (forever)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
+import Data.Default (Default(..))
 import Data.String (IsString(..))
 import Data.Text (Text)
 import qualified Data.Text as Text
@@ -198,19 +201,16 @@ consume conn (Queue _ _ options) = do
 
 
 
-consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (ConsumeResult msg)
-consumeNext conn queue =
-    poll pollDelay $ consume conn queue
-
-  where
-    pollDelay = 1 * 1000
+consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Int -> Connection -> Queue key msg -> m (ConsumeResult msg)
+consumeNext pd conn queue =
+    poll pd $ consume conn queue
 
 
 
-worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
-worker conn queue onError action =
+worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => WorkerOptions -> Connection -> Queue key a -> (ByteString -> WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
+worker opts conn queue onError action =
   forever $ do
-    eres <- consumeNext conn queue
+    eres <- consumeNext (pollDelay opts) conn queue
     case eres of
       Error (ParseError reason bd) ->
         onError bd (MessageParseError reason)
@@ -219,8 +219,18 @@ worker conn queue onError action =
         catch
           (action msg)
           (onError (body msg) . OtherException)
+    liftBase $ threadDelay (loopDelay opts)
 
+data WorkerOptions = WorkerOptions
+  { pollDelay :: Int
+  , loopDelay :: Int
+  } deriving (Show, Eq)
 
+instance Default WorkerOptions where
+  def = WorkerOptions
+    { pollDelay = 1 * 1000
+    , loopDelay = 0
+    }
 
 data WorkerException e
   = MessageParseError String
