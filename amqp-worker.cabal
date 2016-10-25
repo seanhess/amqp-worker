@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                amqp-worker
-version:             0.1.0.1
+version:             0.1.0.2
 synopsis:            High level functions for working with message queue
 description:         High level functions for working with message queue
 license:             BSD3
@@ -19,7 +19,13 @@ library
   -- other-extensions:
   exposed-modules:
     Network.Worker
-  -- other-modules:
+  other-modules:
+      Network.Worker.Connection
+    , Network.Worker.Key
+    , Network.Worker.Message
+    , Network.Worker.Poll
+    , Network.Worker.Queue
+    , Network.Worker.Worker
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:
