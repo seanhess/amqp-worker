@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Network.Worker.Worker where
+module Network.AMQP.Worker.Worker where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException(..))
@@ -11,9 +11,9 @@ import Data.ByteString.Lazy (ByteString)
 import Data.Default (Default(..))
 import Control.Monad.Base (liftBase)
 
-import Network.Worker.Connection (Connection)
-import Network.Worker.Queue (Queue(..))
-import Network.Worker.Message (Message(..), ConsumeResult(..), ParseError(..), Microseconds, consumeNext)
+import Network.AMQP.Worker.Connection (Connection)
+import Network.AMQP.Worker.Queue (Queue(..))
+import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(..), Microseconds, consumeNext)
 
 
 

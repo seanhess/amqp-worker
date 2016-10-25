@@ -1,5 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Network.Worker.Connection
+module Network.AMQP.Worker.Connection
   ( Connection
   , connect
   , disconnect

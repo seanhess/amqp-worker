@@ -12,8 +12,8 @@ Type-safe AMQP workers. Compatible with RabbitMQ
     import qualified Data.Aeson as Aeson
     import Data.Text (Text)
     import GHC.Generics (Generic)
-    import qualified Network.Worker as Worker
-    import Network.Worker (fromURI, Exchange, Queue, Direct, WorkerException(..))
+    import qualified Network.AMQP.Worker as Worker
+    import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, WorkerException(..))
 
     data TestMessage = TestMessage
       { greeting :: Text }

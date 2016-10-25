@@ -18,8 +18,8 @@
 -- > import Data.Aeson (FromJSON, ToJSON)
 -- > import Data.Text (Text)
 -- > import GHC.Generics (Generic)
--- > import qualified Network.Worker as Worker
--- > import Network.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
+-- > import qualified Network.AMQP.Worker as Worker
+-- > import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
 -- >
 -- > data TestMessage = TestMessage
 -- >  { greeting :: Text }
@@ -70,7 +70,7 @@
 -- >   putStrLn "Do something with errors"
 -- >   print e
 
-module Network.Worker
+module Network.AMQP.Worker
   (
   -- * Declaring Queues and Exchanges
     exchange
@@ -119,8 +119,8 @@ module Network.Worker
 import qualified Data.Default as Default
 import qualified Network.AMQP as AMQP
 
-import Network.Worker.Key
-import Network.Worker.Connection
-import Network.Worker.Queue
-import Network.Worker.Message
-import Network.Worker.Worker
+import Network.AMQP.Worker.Key
+import Network.AMQP.Worker.Connection
+import Network.AMQP.Worker.Queue
+import Network.AMQP.Worker.Message
+import Network.AMQP.Worker.Worker

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Network.Worker.Message where
+module Network.AMQP.Worker.Message where
 
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Base (liftBase)
@@ -10,10 +10,10 @@ import Data.ByteString.Lazy (ByteString)
 import Network.AMQP (newMsg, DeliveryMode(..), Ack(..), QueueOpts(..))
 import qualified Network.AMQP as AMQP
 
-import Network.Worker.Key (RoutingKey(..))
-import Network.Worker.Poll (poll)
-import Network.Worker.Connection (Connection, withChannel)
-import Network.Worker.Queue (Queue(..), Exchange(..), ExchangeName, Direct)
+import Network.AMQP.Worker.Key (RoutingKey(..))
+import Network.AMQP.Worker.Poll (poll)
+import Network.AMQP.Worker.Connection (Connection, withChannel)
+import Network.AMQP.Worker.Queue (Queue(..), Exchange(..), ExchangeName, Direct)
 
 -- types --------------------------
 

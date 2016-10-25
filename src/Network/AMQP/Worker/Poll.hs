@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Network.Worker.Poll where
+module Network.AMQP.Worker.Poll where
 
 import Control.Concurrent (threadDelay)
 import Control.Monad.Trans.Control (MonadBaseControl)

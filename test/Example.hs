@@ -6,8 +6,8 @@ import Control.Monad.Catch (SomeException)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import qualified Network.Worker as Worker
-import Network.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
+import qualified Network.AMQP.Worker as Worker
+import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
 
 data TestMessage = TestMessage
   { greeting :: Text }

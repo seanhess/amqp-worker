@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Worker.Key
+module Network.AMQP.Worker.Key
   ( QueueKey(..)
   , RoutingKey(..)
   , BindingKey(..)

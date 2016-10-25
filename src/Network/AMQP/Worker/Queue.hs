@@ -1,12 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Worker.Queue where
+module Network.AMQP.Worker.Queue where
 
 import Data.Text (Text)
 import qualified Network.AMQP as AMQP
 import Network.AMQP (ExchangeOpts(..), QueueOpts(..))
 
-import Network.Worker.Key (RoutingKey(..), BindingKey(..), QueueKey(..))
-import Network.Worker.Connection (Connection, withChannel)
+import Network.AMQP.Worker.Key (RoutingKey(..), BindingKey(..), QueueKey(..))
+import Network.AMQP.Worker.Connection (Connection, withChannel)
 
 
 type ExchangeName = Text
