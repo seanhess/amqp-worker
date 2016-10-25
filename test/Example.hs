@@ -8,6 +8,7 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import qualified Network.AMQP.Worker as Worker
 import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
+import System.IO (hSetBuffering, stdout, stderr, BufferMode(..))
 
 data TestMessage = TestMessage
   { greeting :: Text }
@@ -62,7 +63,6 @@ onError e = do
 
 main :: IO ()
 main = do
-  -- hSetBuffering stdout LineBuffering
-  -- hSetBuffering stderr LineBuffering
-  -- example
-  return ()
+  hSetBuffering stdout LineBuffering
+  hSetBuffering stderr LineBuffering
+  example

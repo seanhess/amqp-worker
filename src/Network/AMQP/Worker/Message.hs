@@ -71,8 +71,9 @@ publish conn (Queue (Exchange exg) key _) =
 -- >   Notihng -> putStrLn "No messages on the queue"
 consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ _ options) = do
-  mme <- withChannel conn $ \chan ->
-    liftBase $ AMQP.getMsg chan Ack (queueName options)
+  mme <- withChannel conn $ \chan -> do
+    m <- liftBase $ AMQP.getMsg chan Ack (queueName options)
+    pure m
 
   case mme of
     Nothing ->

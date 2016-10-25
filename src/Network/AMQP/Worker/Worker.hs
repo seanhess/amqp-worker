@@ -3,13 +3,13 @@ module Network.AMQP.Worker.Worker where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException(..))
+import Control.Monad.Base (liftBase)
 import Control.Monad.Catch (Exception(..), catch, MonadCatch)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad (forever)
 import Data.Aeson (FromJSON)
 import Data.ByteString.Lazy (ByteString)
 import Data.Default (Default(..))
-import Control.Monad.Base (liftBase)
 
 import Network.AMQP.Worker.Connection (Connection)
 import Network.AMQP.Worker.Queue (Queue(..))
