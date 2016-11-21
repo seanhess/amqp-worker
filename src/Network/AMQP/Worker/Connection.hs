@@ -6,15 +6,14 @@ module Network.AMQP.Worker.Connection
   , withChannel
   ) where
 
-import Control.Concurrent.MVar (readMVar, newEmptyMVar, putMVar)
 import Data.Pool (Pool)
 import qualified Data.Pool as Pool
 import qualified Network.AMQP as AMQP
 import Network.AMQP (Channel)
 import Control.Monad.Trans.Control (MonadBaseControl)
 
-newtype Connection =
-  Connection (Pool Channel)
+data Connection =
+  Connection AMQP.Connection (Pool Channel)
 
 -- | Connect to the AMQP server. This returns a connection pool which will automatically re-open the connection as needed if an exception occurs.
 --
@@ -23,46 +22,32 @@ newtype Connection =
 connect :: AMQP.ConnectionOpts -> IO Connection
 connect opts = do
 
-    chansVar <- newEmptyMVar
+    -- open one connection
+    conn <- AMQP.openConnection'' opts
 
-    -- keep one connection open
-    conns <- Pool.createPool createConn (destroyConn chansVar) 1 connOpenTime 1
+    -- open a shared pool for channels
+    chans <- Pool.createPool (create conn) destroy numStripes openTime numChans
 
-    -- the channels use the pool to create themselves
-    chans <- Pool.createPool (create conns) destroy numStripes openTime numResources
-
-    putMVar chansVar chans
-
-    pure $ Connection chans
+    pure $ Connection conn chans
   where
     numStripes = 1
     openTime = 10
-    numResources = 4
-    connOpenTime = 60
+    numChans = 4
 
-    create connPool = do
-      Pool.withResource connPool $ AMQP.openChannel
+    create conn =
+      AMQP.openChannel conn
 
-    destroy chan = do
+    destroy chan =
       AMQP.closeChannel chan
-
-    createConn = do
-      conn <- AMQP.openConnection'' opts
-      pure conn
-
-    destroyConn chans conn = do
-      -- destroy all channels or they will be stale and throw exceptions
-      chanPool <- readMVar chans
-      Pool.destroyAllResources chanPool
-      AMQP.closeConnection conn
 
 
 disconnect :: Connection -> IO ()
-disconnect (Connection p) =
+disconnect (Connection c p) = do
     Pool.destroyAllResources p
+    AMQP.closeConnection c
 
 
 
 withChannel :: MonadBaseControl IO m => Connection -> (Channel -> m b) -> m b
-withChannel (Connection p) action =
+withChannel (Connection _ p) action = do
     Pool.withResource p action
