@@ -15,7 +15,7 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 data Connection =
   Connection AMQP.Connection (Pool Channel)
 
--- | Connect to the AMQP server. This returns a connection pool which will automatically re-open the connection as needed if an exception occurs.
+-- | Connect to the AMQP server.
 --
 -- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
 --
