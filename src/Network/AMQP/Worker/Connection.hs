@@ -54,7 +54,7 @@ connect opts = do
       chan <- catch (AMQP.openChannel conn) (createEx cvar)
       return chan
 
-    createEx cvar (ConnectionClosedException _) = do
+    createEx cvar (ConnectionClosedException _ _) = do
       reopenConnection cvar
       create cvar
 
