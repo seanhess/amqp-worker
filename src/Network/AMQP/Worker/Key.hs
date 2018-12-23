@@ -3,6 +3,7 @@
 module Network.AMQP.Worker.Key
   ( Key(..)
   , Binding(..)
+  , BindingName
   , Routing
   , keyText
   , KeySegment(..)
@@ -13,6 +14,8 @@ import qualified Data.Text as Text
 import qualified Data.List as List
 import qualified Data.List.Split as List
 import Data.String (IsString(..))
+
+
 
 -- | Every message is sent with a period delimited routing key
 --
@@ -46,12 +49,14 @@ class KeySegment a where
     segmentText :: a -> Text
 
 
+type BindingName = Text
+
 -- | A dynamic binding address for topic queues
 --
 -- > commentsKey :: Key Binding
 -- > commentsKey = "posts.*.comments.*"
 data Binding
-    = Name Text
+    = Name BindingName
     | Star
     | Hash
     deriving (Eq, Show)

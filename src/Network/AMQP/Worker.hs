@@ -90,8 +90,8 @@ module Network.AMQP.Worker
   -- * Initializing exchanges and queues
   , bindQueue
 
-  -- * Publishing Messages
-  , publish
+  -- * Sending Messages
+  , send
   , publishToExchange
 
   -- * Reading Messages
