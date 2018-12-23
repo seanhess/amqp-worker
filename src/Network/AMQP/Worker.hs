@@ -76,10 +76,10 @@ module Network.AMQP.Worker
     exchange
   , ExchangeName
   , queue
-  , topicQueue
+  -- , topicQueue
   , Exchange(..)
   , Queue(..)
-  , Direct, Topic
+  -- , Direct, Topic
 
   -- * Connecting
   , Connection
@@ -88,7 +88,7 @@ module Network.AMQP.Worker
   , AMQP.fromURI
 
   -- * Initializing exchanges and queues
-  , initQueue
+  , bindQueue
 
   -- * Publishing Messages
   , publish

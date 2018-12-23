@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Network.AMQP.Worker.Key
   ( Key(..)
   , Binding(..)
@@ -13,7 +14,12 @@ import Data.String (IsString(..))
 --
 -- > newCommentKey :: Key Routing
 -- > newCommentKey = "posts.1.comments.new"
-type Routing = String
+newtype Routing = Routing String
+    deriving (Eq, IsString)
+
+instance Show Routing where
+  show (Routing s) = s
+
 
 
 newtype Key a = Key [a]
@@ -50,4 +56,3 @@ instance Show Binding where
   show (Name t) = t
   show Star = "*"
   show Hash = "#"
-

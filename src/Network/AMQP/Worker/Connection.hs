@@ -7,6 +7,7 @@ module Network.AMQP.Worker.Connection
   ) where
 
 import Control.Concurrent.MVar (MVar, putMVar, newEmptyMVar, readMVar, takeMVar)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Catch (throwM, catch)
 import Data.Pool (Pool)
 import qualified Data.Pool as Pool
@@ -21,8 +22,8 @@ data Connection =
 --
 -- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
 --
-connect :: AMQP.ConnectionOpts -> IO Connection
-connect opts = do
+connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
+connect opts = liftIO $ do
 
     -- create a single connection in an mvar
     cvar <- newEmptyMVar
@@ -64,8 +65,8 @@ connect opts = do
       AMQP.closeChannel chan
 
 
-disconnect :: Connection -> IO ()
-disconnect (Connection c p) = do
+disconnect :: MonadIO m => Connection -> m ()
+disconnect (Connection c p) = liftIO $ do
     conn <- readMVar c
     Pool.destroyAllResources p
     AMQP.closeConnection conn

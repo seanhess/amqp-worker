@@ -32,7 +32,7 @@ import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(.
 -- >     onError e = do
 -- >       putStrLn "Do something with errors"
 
-worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => WorkerOptions -> Connection -> Queue key a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
+worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => WorkerOptions -> Connection -> Queue a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
 worker opts conn queue onError action =
   forever $ do
     eres <- consumeNext (pollDelay opts) conn queue

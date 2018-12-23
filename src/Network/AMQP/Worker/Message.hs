@@ -14,7 +14,7 @@ import qualified Network.AMQP as AMQP
 import Network.AMQP.Worker.Key (Key, Routing)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
-import Network.AMQP.Worker.Queue (Queue(..), Direct)
+import Network.AMQP.Worker.Queue (Queue(..))
 import Network.AMQP.Worker.Exchange (Exchange(..), ExchangeName) 
 
 -- types --------------------------
@@ -57,10 +57,10 @@ publishToExchange conn exg rk msg =
 
 -- | publish a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
--- > let queue = Worker.queue exchange "users" :: Queue Direct User
+-- > let queue = Worker.queue exchange "users" :: Queue User
 -- > publish conn queue (User "username")
-publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Queue Direct msg -> msg -> m ()
-publish conn (Queue (Exchange exg) key _) =
+publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Queue msg -> msg -> m ()
+publish conn (Exchange exg) (Queue key _) =
   publishToExchange conn (AMQP.exchangeName exg) key
 
 
@@ -71,8 +71,8 @@ publish conn (Queue (Exchange exg) key _) =
 -- >   Just (Parsed m) -> print m
 -- >   Just (Error e) -> putStrLn "could not parse message"
 -- >   Notihng -> putStrLn "No messages on the queue"
-consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue key msg -> m (Maybe (ConsumeResult msg))
-consume conn (Queue _ _ options) = do
+consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
+consume conn (Queue _ options) = do
   mme <- withChannel conn $ \chan -> do
     m <- liftBase $ AMQP.getMsg chan Ack (queueName options)
     pure m
@@ -99,6 +99,6 @@ consume conn (Queue _ _ options) = do
 -- > case res of
 -- >   (Parsed m) -> print m
 -- >   (Error e) -> putStrLn "could not parse message"
-consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Microseconds -> Connection -> Queue key msg -> m (ConsumeResult msg)
+consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
 consumeNext pd conn queue =
     poll pd $ consume conn queue

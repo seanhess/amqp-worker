@@ -4,10 +4,10 @@ module Main where
 
 import Control.Monad.Catch (SomeException)
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import GHC.Generics (Generic)
 import qualified Network.AMQP.Worker as Worker
-import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
+import Network.AMQP.Worker (fromURI, Exchange, Queue, def, WorkerException, Message(..), Connection)
 import System.IO (hSetBuffering, stdout, stderr, BufferMode(..))
 
 data TestMessage = TestMessage
@@ -22,12 +22,12 @@ exchange :: Exchange
 exchange = Worker.exchange "testExchange"
 
 
-queue :: Queue Direct TestMessage
-queue = Worker.queue exchange "testQueue"
+queue :: Queue TestMessage
+queue = Worker.queue "testQueue"
 
 
-results :: Queue Direct Text
-results = Worker.queue exchange "resultQueue"
+results :: Queue Text
+results = Worker.queue "resultQueue"
 
 
 example :: IO ()
@@ -36,11 +36,14 @@ example = do
   conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
   -- initialize the queues
-  Worker.initQueue conn queue
-  Worker.initQueue conn results
+  Worker.bindQueue conn exchange queue
+  Worker.bindQueue conn exchange results
+
+  putStrLn "Enter a message"
+  msg <- getLine
 
   -- publish a message
-  Worker.publish conn queue (TestMessage "hello world")
+  Worker.publish conn exchange queue (TestMessage $ pack msg)
 
   -- create a worker, the program loops here
   Worker.worker def conn queue onError (onMessage conn)
@@ -51,7 +54,7 @@ onMessage conn m = do
   let testMessage = value m
   putStrLn "Got Message"
   print testMessage
-  Worker.publish conn results (greeting testMessage)
+  Worker.publish conn exchange results (greeting testMessage)
 
 
 onError :: WorkerException SomeException -> IO ()
