@@ -1,27 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Queue where
 
-import Data.Text (Text, pack)
+import Data.Text (pack)
 import qualified Network.AMQP as AMQP
-import Network.AMQP (ExchangeOpts(..), QueueOpts(..))
+import Network.AMQP (QueueOpts(..))
 
 import Network.AMQP.Worker.Key (Key(..), Routing, Binding)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
+import Network.AMQP.Worker.Exchange (Exchange(..))
 
 
-type ExchangeName = Text
-
-
--- | Declare an exchange
---
--- In AMQP, exchanges can be fanout, direct, or topic. This library attempts to simplify this choice by making all exchanges be topic exchanges, and allowing the user to specify topic or direct behavior on the queue itself. See @queue@
---
--- > exchange :: Exchange
--- > exchange = Worker.exchange "testExchange"
-
-exchange :: ExchangeName -> Exchange
-exchange nm =
-  Exchange $ AMQP.newExchange { exchangeName = nm, exchangeType = "topic" }
 
 -- | Declare a direct queue with the name @Key Routing@. Direct queues work as you expect: you can publish messages to them and read from them.
 --
@@ -41,10 +29,6 @@ topicQueue :: Exchange -> Key Binding -> Queue Topic msg
 topicQueue exg key =
   Queue exg key $ AMQP.newQueue { queueName = pack $ show key }
 
-
-data Exchange =
-  Exchange AMQP.ExchangeOpts
-  deriving (Show, Eq)
 
 -- | Queues consist of an exchange, a type (Direct or Topic), and a message type
 --

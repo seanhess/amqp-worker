@@ -14,7 +14,8 @@ import qualified Network.AMQP as AMQP
 import Network.AMQP.Worker.Key (Key, Routing)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
-import Network.AMQP.Worker.Queue (Queue(..), Exchange(..), ExchangeName, Direct)
+import Network.AMQP.Worker.Queue (Queue(..), Direct)
+import Network.AMQP.Worker.Exchange (Exchange(..), ExchangeName) 
 
 -- types --------------------------
 

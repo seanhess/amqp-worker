@@ -123,3 +123,4 @@ import Network.AMQP.Worker.Connection
 import Network.AMQP.Worker.Queue
 import Network.AMQP.Worker.Message
 import Network.AMQP.Worker.Worker
+import Network.AMQP.Worker.Exchange
