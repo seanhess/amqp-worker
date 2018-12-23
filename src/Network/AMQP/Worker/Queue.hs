@@ -3,7 +3,7 @@ module Network.AMQP.Worker.Queue where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Network.AMQP as AMQP
-import Network.AMQP (QueueOpts(..))
+import Network.AMQP (QueueOpts(..), ExchangeOpts(..))
 
 import Network.AMQP.Worker.Key (Key(..), Routing, keyText)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
@@ -37,11 +37,12 @@ data Queue msg =
 -- > Worker.initQueue conn queue
 
 bindQueue :: (MonadIO m) => Connection -> Exchange -> Queue msg -> m ()
-bindQueue conn (Exchange exg) (Queue key) =
+bindQueue conn (Exchange exgName) (Queue key) =
   liftIO $ withChannel conn $ \chan -> do
     let bindingName = keyText key
     let options = AMQP.newQueue { queueName = bindingName }
+    let exg = AMQP.newExchange { exchangeName = exgName, exchangeType = "topic" }
     _ <- AMQP.declareExchange chan exg
     _ <- AMQP.declareQueue chan options
-    _ <- AMQP.bindQueue chan bindingName (AMQP.exchangeName exg) bindingName
+    _ <- AMQP.bindQueue chan bindingName exgName bindingName
     return ()

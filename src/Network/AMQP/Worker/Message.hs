@@ -60,7 +60,7 @@ publishToExchange conn exg rk msg =
 -- > publish conn queue (User "username")
 publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Queue msg -> msg -> m ()
 publish conn (Exchange exg) (Queue key) =
-  publishToExchange conn (AMQP.exchangeName exg) key
+  publishToExchange conn exg key
 
 
 -- | Check for a message once and attempt to parse it

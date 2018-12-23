@@ -2,8 +2,6 @@
 module Network.AMQP.Worker.Exchange where
 
 import Data.Text (Text)
-import qualified Network.AMQP as AMQP
-import Network.AMQP (ExchangeOpts(..))
 
 type ExchangeName = Text
 
@@ -16,11 +14,10 @@ type ExchangeName = Text
 -- > exchange = Worker.exchange "testExchange"
 
 exchange :: ExchangeName -> Exchange
-exchange nm =
-  Exchange $ AMQP.newExchange { exchangeName = nm, exchangeType = "topic" }
+exchange nm = Exchange nm
 
 
-data Exchange =
-  Exchange AMQP.ExchangeOpts
+
+newtype Exchange = Exchange ExchangeName
   deriving (Show, Eq)
 
