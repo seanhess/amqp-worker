@@ -43,6 +43,7 @@ example = do
   msg <- getLine
 
   -- publish a message
+  putStrLn "Publishing a message"
   Worker.publish conn exchange test (TestMessage $ pack msg)
 
   -- create a worker, the program loops here

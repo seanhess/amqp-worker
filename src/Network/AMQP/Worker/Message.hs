@@ -6,12 +6,11 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Base (liftBase)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
-import Data.Text (pack)
 import Data.ByteString.Lazy (ByteString)
-import Network.AMQP (newMsg, DeliveryMode(..), Ack(..), QueueOpts(..))
+import Network.AMQP (newMsg, DeliveryMode(..), Ack(..))
 import qualified Network.AMQP as AMQP
 
-import Network.AMQP.Worker.Key (Key, Routing)
+import Network.AMQP.Worker.Key (Key, Routing, keyText)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
 import Network.AMQP.Worker.Queue (Queue(..))
@@ -50,8 +49,8 @@ jsonMessage a = newMsg
 -- > publishToExchange conn "users.admin.created" (User "username")
 publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> Key Routing -> a -> m ()
 publishToExchange conn exg rk msg =
-  withChannel conn $ \chan -> do
-    _ <- liftBase $ AMQP.publishMsg chan exg (pack $ show rk) (jsonMessage msg)
+  withChannel conn $ \chan -> liftBase $ do
+    _ <- AMQP.publishMsg chan exg (keyText rk) (jsonMessage msg)
     return ()
 
 
@@ -60,7 +59,7 @@ publishToExchange conn exg rk msg =
 -- > let queue = Worker.queue exchange "users" :: Queue User
 -- > publish conn queue (User "username")
 publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Queue msg -> msg -> m ()
-publish conn (Exchange exg) (Queue key _) =
+publish conn (Exchange exg) (Queue key) =
   publishToExchange conn (AMQP.exchangeName exg) key
 
 
@@ -72,9 +71,9 @@ publish conn (Exchange exg) (Queue key _) =
 -- >   Just (Error e) -> putStrLn "could not parse message"
 -- >   Notihng -> putStrLn "No messages on the queue"
 consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
-consume conn (Queue _ options) = do
+consume conn (Queue key) = do
   mme <- withChannel conn $ \chan -> do
-    m <- liftBase $ AMQP.getMsg chan Ack (queueName options)
+    m <- liftBase $ AMQP.getMsg chan Ack (keyText key)
     pure m
 
   case mme of
