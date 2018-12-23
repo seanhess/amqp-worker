@@ -22,8 +22,8 @@ exchange :: Exchange
 exchange = Worker.exchange "testExchange"
 
 
-queue :: Queue TestMessage
-queue = Worker.queue "testQueue"
+test :: Queue TestMessage
+test = Worker.queue "testQueue"
 
 
 results :: Queue Text
@@ -36,17 +36,17 @@ example = do
   conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
   -- initialize the queues
-  Worker.bindQueue conn exchange queue
+  Worker.bindQueue conn exchange test
   Worker.bindQueue conn exchange results
 
   putStrLn "Enter a message"
   msg <- getLine
 
   -- publish a message
-  Worker.publish conn exchange queue (TestMessage $ pack msg)
+  Worker.publish conn exchange test (TestMessage $ pack msg)
 
   -- create a worker, the program loops here
-  Worker.worker def conn queue onError (onMessage conn)
+  Worker.worker def conn test onError (onMessage conn)
 
 
 onMessage :: Connection -> Message TestMessage -> IO ()
