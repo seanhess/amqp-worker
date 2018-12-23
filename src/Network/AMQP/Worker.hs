@@ -109,10 +109,9 @@ module Network.AMQP.Worker
   , Default.def
 
   -- * Routing Keys
-  , RoutingKey(..)
-  , BindingKey(..)
-  , BindingName(..)
-  , QueueKey(..)
+  , Key(..)
+  , Routing
+  , Binding(..)
 
   ) where
 

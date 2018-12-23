@@ -6,11 +6,12 @@ import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad.Base (liftBase)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
+import Data.Text (pack)
 import Data.ByteString.Lazy (ByteString)
 import Network.AMQP (newMsg, DeliveryMode(..), Ack(..), QueueOpts(..))
 import qualified Network.AMQP as AMQP
 
-import Network.AMQP.Worker.Key (RoutingKey(..))
+import Network.AMQP.Worker.Key (Key, Routing)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
 import Network.AMQP.Worker.Queue (Queue(..), Exchange(..), ExchangeName, Direct)
@@ -46,10 +47,10 @@ jsonMessage a = newMsg
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
 -- > publishToExchange conn "users.admin.created" (User "username")
-publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> RoutingKey -> a -> m ()
-publishToExchange conn exg (RoutingKey rk) msg =
+publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> Key Routing -> a -> m ()
+publishToExchange conn exg rk msg =
   withChannel conn $ \chan -> do
-    _ <- liftBase $ AMQP.publishMsg chan exg rk (jsonMessage msg)
+    _ <- liftBase $ AMQP.publishMsg chan exg (pack $ show rk) (jsonMessage msg)
     return ()
 
 

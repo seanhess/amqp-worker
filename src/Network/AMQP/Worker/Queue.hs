@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Queue where
 
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import qualified Network.AMQP as AMQP
 import Network.AMQP (ExchangeOpts(..), QueueOpts(..))
 
-import Network.AMQP.Worker.Key (RoutingKey(..), BindingKey(..), QueueKey(..))
+import Network.AMQP.Worker.Key (Key(..), Routing, Binding)
 import Network.AMQP.Worker.Connection (Connection, withChannel)
 
 
@@ -23,23 +23,23 @@ exchange :: ExchangeName -> Exchange
 exchange nm =
   Exchange $ AMQP.newExchange { exchangeName = nm, exchangeType = "topic" }
 
--- | Declare a direct queue with the name @RoutingKey@. Direct queues work as you expect: you can publish messages to them and read from them.
+-- | Declare a direct queue with the name @Key Routing@. Direct queues work as you expect: you can publish messages to them and read from them.
 --
 -- > queue :: Queue Direct MyMessageType
 -- > queue = Worker.queue exchange "testQueue"
 
-queue :: Exchange -> RoutingKey -> Queue Direct msg
-queue exg (RoutingKey key) =
-  Queue exg (RoutingKey key) $ AMQP.newQueue { queueName = key }
+queue :: Exchange -> Key Routing -> Queue Direct msg
+queue exg key =
+  Queue exg key $ AMQP.newQueue { queueName = pack $ show key }
 
 -- | Declare a topic queue. Topic queues allow you to bind a queue to a dynamic address with wildcards
 --
 -- > queue :: Queue Topic MyMessageType
 -- > queue = Worker.topicQueue exchange "new-users.*"
 
-topicQueue :: Exchange -> BindingKey -> Queue Topic msg
+topicQueue :: Exchange -> Key Binding -> Queue Topic msg
 topicQueue exg key =
-  Queue exg key $ AMQP.newQueue { queueName = showKey key }
+  Queue exg key $ AMQP.newQueue { queueName = pack $ show key }
 
 
 data Exchange =
@@ -53,9 +53,9 @@ data Queue queueType msg =
   Queue Exchange queueType AMQP.QueueOpts
   deriving (Show, Eq)
 
-type Direct = RoutingKey
+type Direct = Key Routing
 
-type Topic = BindingKey
+type Topic = Key Binding
 
 
 
@@ -65,10 +65,10 @@ type Topic = BindingKey
 -- > conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 -- > Worker.initQueue conn queue
 
-initQueue :: (QueueKey key) => Connection -> Queue key msg -> IO ()
+initQueue :: Show a => Connection -> Queue (Key a) msg -> IO ()
 initQueue conn (Queue (Exchange exg) key options) =
   withChannel conn $ \chan -> do
     _ <- AMQP.declareExchange chan exg
     _ <- AMQP.declareQueue chan options
-    _ <- AMQP.bindQueue chan (AMQP.queueName options) (AMQP.exchangeName exg) (showKey key)
+    _ <- AMQP.bindQueue chan (AMQP.queueName options) (AMQP.exchangeName exg) (pack $ show key)
     return ()

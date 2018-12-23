@@ -1,62 +1,53 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Key
-  ( QueueKey(..)
-  , RoutingKey(..)
-  , BindingKey(..)
-  , BindingName(..)
+  ( Key(..)
+  , Binding(..)
+  , Routing
   ) where
 
 import qualified Data.List as List
 import qualified Data.List.Split as List
 import Data.String (IsString(..))
-import Data.Text (Text)
-import qualified Data.Text as Text
 
--- | A name used to address queues
-newtype RoutingKey = RoutingKey Text
-  deriving (Show, Eq)
+-- | Every message is sent with a period delimited routing key
+--
+-- > newCommentKey :: Key Routing
+-- > newCommentKey = "posts.1.comments.new"
+type Routing = String
 
-instance IsString RoutingKey where
-  fromString = RoutingKey . Text.pack
 
-instance QueueKey RoutingKey where
-  showKey (RoutingKey t) = t
+newtype Key a = Key [a]
+  deriving (Eq)
+
+
+instance IsString a => IsString (Key a) where
+  fromString s =
+    let segments = List.splitOn "." s
+        names = List.map fromString segments
+    in Key names
+
+instance (Show a) => Show (Key a) where
+    show (Key ns) =
+      List.intercalate "." . List.map show $ ns
 
 
 -- | A dynamic binding address for topic queues
 --
--- > commentsKey :: BindingKey
--- > commentsKey = "posts.*.comments"
-newtype BindingKey = BindingKey [BindingName]
-  deriving (Eq)
-
-instance QueueKey BindingKey where
-  showKey (BindingKey ns) =
-    Text.intercalate "." . List.map bindingNameText $ ns
-
-instance IsString BindingKey where
-  fromString s =
-    let segments = List.splitOn "." s
-        names = List.map fromString segments
-    in BindingKey names
-
-
-data BindingName
-  = Name Text
+-- > commentsKey :: Key Binding
+-- > commentsKey = "posts.*.comments.*"
+data Binding
+  = Name String
   | Star
   | Hash
   deriving (Eq)
 
-instance IsString BindingName where
+instance IsString Binding where
   fromString "*" = Star
   fromString "#" = Hash
-  fromString n = Name (Text.pack n)
+  fromString n = Name n
 
-bindingNameText :: BindingName -> Text
-bindingNameText (Name t) = t
-bindingNameText Star = "*"
-bindingNameText Hash = "#"
+instance Show Binding where
+  show (Name t) = t
+  show Star = "*"
+  show Hash = "#"
 
-
-class QueueKey key where
-  showKey :: key -> Text
