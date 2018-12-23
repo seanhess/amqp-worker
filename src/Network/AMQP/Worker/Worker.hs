@@ -13,6 +13,7 @@ import Data.Default (Default(..))
 
 import Network.AMQP.Worker.Connection (Connection)
 import Network.AMQP.Worker.Queue (Queue(..))
+-- import Network.AMQP.Worker.Key (Key, Routing)
 import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(..), Microseconds, consumeNext)
 
 

@@ -75,7 +75,7 @@ module Network.AMQP.Worker
   -- * Declaring Queues and Exchanges
     exchange
   , ExchangeName
-  , queue
+  -- , queue
   -- , topicQueue
   , Exchange(..)
   , Queue(..)
@@ -89,6 +89,8 @@ module Network.AMQP.Worker
 
   -- * Initializing exchanges and queues
   , bindQueue
+  , direct
+  , topic
 
   -- * Sending Messages
   , send

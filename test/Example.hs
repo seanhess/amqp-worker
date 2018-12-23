@@ -10,6 +10,7 @@ import GHC.Generics (Generic)
 import qualified Network.AMQP.Worker as Worker
 import Network.AMQP.Worker (fromURI, Exchange, Queue, def, WorkerException, Message(..), Connection)
 import qualified Network.AMQP.Worker.Topic as Topic
+import Network.AMQP.Worker.Key (Key, Routing, Binding)
 import System.IO (hSetBuffering, stdout, stderr, BufferMode(..))
 
 data TestMessage = TestMessage
@@ -24,16 +25,16 @@ exchange :: Exchange
 exchange = Worker.exchange "testExchange"
 
 
-newMessages :: Queue TestMessage
-newMessages = Worker.queue "messages.new"
+newMessages :: Key Routing TestMessage
+newMessages = "messages.new"
 
 
-ummmm :: Queue TestMessage
-ummmm = Worker.queue "messages.*"
+-- ummmm :: Queue TestMessage
+-- ummmm = Worker.queue "messages.*"
 
 
-results :: Queue Text
-results = Worker.queue "results"
+results :: Key Routing Text
+results = "results"
 
 
 example :: IO ()
@@ -42,9 +43,12 @@ example = do
   conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
   -- initialize the queues
-  Worker.bindQueue conn exchange newMessages
-  Worker.bindQueue conn exchange ummmm
-  Worker.bindQueue conn exchange results
+  Worker.bindQueue conn exchange (Worker.direct newMessages)
+  Worker.bindQueue conn exchange (Worker.direct results)
+
+  -- topic queue!
+  let handleAnyMessage = Worker.topic "messages.*" "handleAnyMessage"
+  Worker.bindQueue conn exchange handleAnyMessage
 
   putStrLn "Enter a message"
   msg <- getLine
@@ -54,9 +58,9 @@ example = do
   Worker.send conn exchange newMessages (TestMessage $ pack msg)
 
   -- create a worker, the program loops here
-  _ <- forkIO $ Worker.worker def conn newMessages onError (onMessage conn)
+  -- Worker.worker def conn (Worker.direct newMessages) onError (onMessage conn)
 
-  _ <- forkIO $ Worker.worker def conn ummmm onError (onMessage conn)
+  -- _ <- forkIO $ Worker.worker def conn ummmm onError (onMessage conn)
 
   putStrLn "Press any key to exit"
   _ <- getLine

@@ -2,7 +2,11 @@
 module Network.AMQP.Worker.Topic where
 
 
-import Network.AMQP.Worker.Key (Binding(..), Key(..), BindingName)
+-- import Network.AMQP.Worker.Key (Binding(..), Key(..), BindingName)
+
+
+
+
 
 
 
@@ -10,33 +14,74 @@ import Network.AMQP.Worker.Key (Binding(..), Key(..), BindingName)
 
 -- you always start out with a single name, like: "messages"
 -- and define the type for that topic
-data Topic msg =
-  Topic (Key Binding)
-  deriving (Show, Eq)
+-- data Topic msg =
+--   Topic (Key Binding)
+--   deriving (Show, Eq)
 
 
-topic :: BindingName -> Topic msg
-topic n = Topic (Key [Name n])
-
-
-
-(<.>) :: Topic msg -> Binding -> Topic msg
-(Topic (Key k)) <.> b = Topic $ Key (k ++ [b])
+-- topic :: BindingName -> Topic msg
+-- topic n = Topic (Key [Name n])
 
 
 
-type Account = ()
+-- (<.>) :: Topic msg -> Binding -> Topic msg
+-- (Topic (Key k)) <.> b = Topic $ Key (k ++ [b])
 
 
-accounts :: Topic Account
-accounts = topic "accounts"
+
+-- type Account = ()
 
 
-accountsNew :: Topic Account
-accountsNew = accounts <.> "new"
+-- accounts :: Topic Account
+-- accounts = topic "accounts"
 
-accountsNew2 :: Topic Account
-accountsNew2 = accounts <.> Star
+
+-- but this is actually a "queue". It's a direct message.
+-- because you shouldn't be able to publish to anything that has a star in it
+-- only things that are concrete
+-- so you start with a Direct queue, you can publish to that shit
+-- if you keep adding name segments, you can keep working with routing keys
+-- but you can make a sub-thing, a topic, which you can subscribe to, but not publish to
+-- you can subscribe to either one
+
+
+-- what is that called?
+-- it's not a queue, that's where things end up
+-- it's a routing key
+
+
+-- RoutingKey + Message Type = XXX
+-- publisher
+-- well, a topic is a pretty good name
+-- you can publish and subscribe to topics
+-- but an EVENT makes it more general
+-- a Subscription is more general
+
+-- Topic = Concrete
+-- Subscription = Not concrete
+-- Queues are an implementation detail and it'll be confusing
+
+-- Topic -> Topic = Direct (You use the send method)
+-- Topic -> Subscription = Event
+
+-- whenever you publish, you publish to a Topic, which is a concrete thing with a specific routing key (no stars) (Routing -> Routing, Routing -> Bdingin, but Binding X-> Routing)
+
+-- when you create a worker, you listen to a Topic or to a Subscription
+-- worker: listen to a topic
+-- subscribe: listen to a subscription
+
+
+-- but when you publish to a topic, with the intention that somneone pick it up, you'd like it to be durable no? Guarantee that it's been created?? Maybe not... I mean, it's not my job to make sure that exists, is it?
+-- well, I can decide it should exist for sure by simply calling createQueue manually.
+-- Otherwise, it'll get created when the subscriber plugs in
+
+
+
+-- accountsNew :: Topic Account
+-- accountsNew = accounts <.> "new"
+
+-- accountsNew2 :: Topic Account
+-- accountsNew2 = accounts <.> Star
 
 
 -- now you can subscribe to topics totally differently from queues

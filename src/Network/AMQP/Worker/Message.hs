@@ -47,7 +47,7 @@ jsonMessage a = newMsg
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
 -- > publishToExchange conn "users.admin.created" (User "username")
-publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> Key Routing -> a -> m ()
+publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> Key Routing a -> a -> m ()
 publishToExchange conn exg rk msg =
   withChannel conn $ \chan -> liftBase $ do
     _ <- AMQP.publishMsg chan exg (keyText rk) (jsonMessage msg)
@@ -58,8 +58,8 @@ publishToExchange conn exg rk msg =
 --
 -- > let queue = Worker.queue exchange "users" :: Queue User
 -- > send conn queue (User "username")
-send :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Queue msg -> msg -> m ()
-send conn (Exchange exg) (Queue key) =
+send :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
+send conn (Exchange exg) key =
   publishToExchange conn exg key
 
 
@@ -71,9 +71,9 @@ send conn (Exchange exg) (Queue key) =
 -- >   Just (Error e) -> putStrLn "could not parse message"
 -- >   Notihng -> putStrLn "No messages on the queue"
 consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
-consume conn (Queue key) = do
+consume conn (Queue _ name) = do
   mme <- withChannel conn $ \chan -> do
-    m <- liftBase $ AMQP.getMsg chan Ack (keyText key)
+    m <- liftBase $ AMQP.getMsg chan Ack name
     pure m
 
   case mme of
@@ -99,5 +99,5 @@ consume conn (Queue key) = do
 -- >   (Parsed m) -> print m
 -- >   (Error e) -> putStrLn "could not parse message"
 consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
-consumeNext pd conn queue =
-    poll pd $ consume conn queue
+consumeNext pd conn key =
+    poll pd $ consume conn key

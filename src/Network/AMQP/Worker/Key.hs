@@ -7,6 +7,7 @@ module Network.AMQP.Worker.Key
   , Routing
   , keyText
   , KeySegment(..)
+  , bindingKey
   ) where
 
 import Data.Text (Text)
@@ -29,20 +30,27 @@ instance KeySegment Routing where
 
 
 
-newtype Key a = Key [a]
+newtype Key a msg = Key [a]
   deriving (Eq, Show)
 
 
-instance IsString a => IsString (Key a) where
+instance IsString a => IsString (Key a msg) where
   fromString s =
     let segments = List.splitOn "." s
         names = List.map fromString segments
     in Key names
 
 
-keyText :: KeySegment a => Key a -> Text
+keyText :: KeySegment a => Key a msg -> Text
 keyText (Key ns) =
     Text.intercalate "." . List.map segmentText $ ns
+
+
+bindingKey :: Key Routing a -> Key Binding a
+bindingKey (Key rs) = Key (map toBind rs)
+
+toBind :: Routing -> Binding
+toBind (Routing t) = fromString $ Text.unpack t
 
 
 class KeySegment a where
