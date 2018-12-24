@@ -3,9 +3,8 @@ module Network.AMQP.Worker.Worker where
 
 import Control.Concurrent (threadDelay)
 import Control.Exception (SomeException(..))
-import Control.Monad.Base (liftBase)
+import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Catch (Exception(..), catch, MonadCatch)
-import Control.Monad.Trans.Control (MonadBaseControl)
 import Control.Monad (forever)
 import Data.Aeson (FromJSON)
 import Data.ByteString.Lazy (ByteString)
@@ -33,7 +32,7 @@ import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(.
 -- >     onError e = do
 -- >       putStrLn "Do something with errors"
 
-worker :: (FromJSON a, MonadBaseControl IO m, MonadCatch m) => WorkerOptions -> Connection -> Queue a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
+worker :: (FromJSON a, MonadIO m, MonadCatch m) => WorkerOptions -> Connection -> Queue a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
 worker opts conn queue onError action =
   forever $ do
     eres <- consumeNext (pollDelay opts) conn queue
@@ -45,7 +44,7 @@ worker opts conn queue onError action =
         catch
           (action msg)
           (onError . OtherException (body msg))
-    liftBase $ threadDelay (loopDelay opts)
+    liftIO $ threadDelay (loopDelay opts)
 
 
 

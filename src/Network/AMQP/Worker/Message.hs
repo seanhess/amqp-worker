@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Network.AMQP.Worker.Message where
 
-import Control.Monad.Trans.Control (MonadBaseControl)
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Base (liftBase)
 import Data.Aeson (ToJSON, FromJSON)
 import qualified Data.Aeson as Aeson
@@ -47,9 +47,9 @@ jsonMessage a = newMsg
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
 -- > publishToExchange conn "users.admin.created" (User "username")
-publishToExchange :: (ToJSON a, MonadBaseControl IO m) => Connection -> ExchangeName -> Key Routing a -> a -> m ()
+publishToExchange :: (ToJSON a, MonadIO m) => Connection -> ExchangeName -> Key Routing a -> a -> m ()
 publishToExchange conn exg rk msg =
-  withChannel conn $ \chan -> liftBase $ do
+  liftIO $ withChannel conn $ \chan -> do
     _ <- AMQP.publishMsg chan exg (keyText rk) (jsonMessage msg)
     return ()
 
@@ -58,7 +58,7 @@ publishToExchange conn exg rk msg =
 --
 -- > let queue = Worker.queue exchange "users" :: Queue User
 -- > publish conn queue (User "username")
-publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
+publish :: (ToJSON msg, MonadIO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
 publish conn (Exchange exg) key =
   publishToExchange conn exg key
 
@@ -70,18 +70,18 @@ publish conn (Exchange exg) key =
 -- >   Just (Parsed m) -> print m
 -- >   Just (Error e) -> putStrLn "could not parse message"
 -- >   Notihng -> putStrLn "No messages on the queue"
-consume :: (FromJSON msg, MonadBaseControl IO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
+consume :: (FromJSON msg, MonadIO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ name) = do
-  mme <- withChannel conn $ \chan -> do
-    m <- liftBase $ AMQP.getMsg chan Ack name
-    pure m
+  mme <- liftIO $ withChannel conn $ \chan -> do
+            m <- liftBase $ AMQP.getMsg chan Ack name
+            pure m
 
   case mme of
     Nothing ->
       return Nothing
 
     Just (msg, env) -> do
-      liftBase $ AMQP.ackEnv env
+      liftIO $ AMQP.ackEnv env
       let bd = AMQP.msgBody msg
       case Aeson.eitherDecode bd of
         Left err ->
@@ -98,6 +98,6 @@ consume conn (Queue _ name) = do
 -- > case res of
 -- >   (Parsed m) -> print m
 -- >   (Error e) -> putStrLn "could not parse message"
-consumeNext :: (FromJSON msg, MonadBaseControl IO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
+consumeNext :: (FromJSON msg, MonadIO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
 consumeNext pd conn key =
     poll pd $ consume conn key
