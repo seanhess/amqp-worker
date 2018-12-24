@@ -57,9 +57,9 @@ publishToExchange conn exg rk msg =
 -- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
 -- > let queue = Worker.queue exchange "users" :: Queue User
--- > send conn queue (User "username")
-send :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
-send conn (Exchange exg) key =
+-- > publish conn queue (User "username")
+publish :: (ToJSON msg, MonadBaseControl IO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
+publish conn (Exchange exg) key =
   publishToExchange conn exg key
 
 

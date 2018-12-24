@@ -93,7 +93,7 @@ module Network.AMQP.Worker
   , topic
 
   -- * Sending Messages
-  , send
+  , publish
   , publishToExchange
 
   -- * Reading Messages
