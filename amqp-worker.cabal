@@ -2,7 +2,7 @@
 -- documentation, see http://haskell.org/cabal/users-guide/
 
 name:                amqp-worker
-version:             0.2.5
+version:             0.3.0
 synopsis:            High level functions for working with message queues
 description:         High level functions for working with message queues
 license:             BSD3
