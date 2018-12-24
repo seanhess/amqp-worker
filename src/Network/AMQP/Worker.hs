@@ -115,6 +115,9 @@ module Network.AMQP.Worker
   , Routing
   , Binding(..)
 
+
+  -- * Monad
+  , MonadWorker(..)
   ) where
 
 import qualified Data.Default as Default
@@ -126,3 +129,4 @@ import Network.AMQP.Worker.Queue
 import Network.AMQP.Worker.Message
 import Network.AMQP.Worker.Worker
 import Network.AMQP.Worker.Exchange
+import Network.AMQP.Worker.Monad (MonadWorker(..))

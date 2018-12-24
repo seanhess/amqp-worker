@@ -61,8 +61,8 @@ example = do
   Worker.publish conn exchange newMessages (TestMessage $ pack msg)
 
   -- create a worker, the program loops here
-  _ <- forkIO $ Worker.worker def conn (Worker.direct newMessages) onError (onMessage conn)
-  _ <- forkIO $ Worker.worker def conn (handleAnyMessages) onError (onMessage conn)
+  _ <- forkIO $ Worker.worker conn exchange def (Worker.direct newMessages) onError (onMessage conn)
+  _ <- forkIO $ Worker.worker conn exchange def (handleAnyMessages) onError (onMessage conn)
 
   -- _ <- forkIO $ Worker.worker def conn ummmm onError (onMessage conn)
 

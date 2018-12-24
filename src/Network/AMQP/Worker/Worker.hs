@@ -12,7 +12,7 @@ import Data.Default (Default(..))
 
 import Network.AMQP.Worker.Connection (Connection)
 import Network.AMQP.Worker.Queue (Queue(..))
--- import Network.AMQP.Worker.Key (Key, Routing)
+import Network.AMQP.Worker.Exchange (Exchange(..))
 import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(..), Microseconds, consumeNext)
 
 
@@ -32,8 +32,8 @@ import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(.
 -- >     onError e = do
 -- >       putStrLn "Do something with errors"
 
-worker :: (FromJSON a, MonadIO m, MonadCatch m) => WorkerOptions -> Connection -> Queue a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
-worker opts conn queue onError action =
+worker :: (FromJSON a, MonadIO m, MonadCatch m) => Connection -> Exchange -> WorkerOptions -> Queue a -> (WorkerException SomeException -> m ()) -> (Message a -> m ()) -> m ()
+worker conn _ opts queue onError action =
   forever $ do
     eres <- consumeNext (pollDelay opts) conn queue
     case eres of
