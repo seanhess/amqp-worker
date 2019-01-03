@@ -1,17 +1,18 @@
-module Main where
+module Spec where
 
-import Test.Tasty
-import Test.Tasty.HUnit
+-- import Test.Tasty
+-- import Test.Tasty.HUnit
 
 main :: IO ()
 main = do
-  defaultMain tests
+  putStrLn "Not implemented"
+  -- defaultMain tests
 
 
-tests :: TestTree
-tests = testGroup "Tests"
-  [ testCase "TODO" testExample ]
+-- tests :: TestTree
+-- tests = testGroup "Tests"
+--   [ testCase "TODO" testExample ]
 
 
-testExample :: Assertion
-testExample = pure ()
+-- testExample :: Assertion
+-- testExample = pure ()

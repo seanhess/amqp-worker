@@ -19,7 +19,7 @@
 -- > import Data.Text (Text)
 -- > import GHC.Generics (Generic)
 -- > import qualified Network.AMQP.Worker as Worker
--- > import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, def, WorkerException, Message(..), Connection)
+-- > import Network.AMQP.Worker (fromURI, Queue, Direct, def, WorkerException, Message(..), Connection)
 -- >
 -- > data TestMessage = TestMessage
 -- >  { greeting :: Text }
@@ -27,10 +27,6 @@
 -- >
 -- > instance FromJSON TestMessage
 -- > instance ToJSON TestMessage
--- >
--- >
--- > exchange :: Exchange
--- > exchange = Worker.exchange "testExchange"
 -- >
 -- >
 -- > queue :: Queue Direct TestMessage
@@ -73,18 +69,16 @@
 module Network.AMQP.Worker
   (
   -- * Declaring Queues and Exchanges
-    exchange
-  , ExchangeName
   -- , queue
   -- , topicQueue
-  , Exchange(..)
-  , Queue(..)
+  Queue(..)
   -- , Direct, Topic
 
   -- * Connecting
   , Connection
   , connect
   , disconnect
+  , exchange
   , AMQP.fromURI
 
   -- * Initializing exchanges and queues
@@ -114,6 +108,7 @@ module Network.AMQP.Worker
   , Key(..)
   , Routing
   , Binding(..)
+  , word, key, star, hash
 
 
   -- * Monad
@@ -128,5 +123,4 @@ import Network.AMQP.Worker.Connection
 import Network.AMQP.Worker.Queue
 import Network.AMQP.Worker.Message
 import Network.AMQP.Worker.Worker
-import Network.AMQP.Worker.Exchange
 import Network.AMQP.Worker.Monad (MonadWorker(..))

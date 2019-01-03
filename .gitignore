@@ -2,3 +2,4 @@
 notes.md
 dist
 .DS_Store
+*.cabal

@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Connection
-  ( Connection
+  ( Connection(..)
   , connect
   , disconnect
   , withChannel
@@ -10,13 +11,20 @@ import Control.Concurrent.MVar (MVar, putMVar, newEmptyMVar, readMVar, takeMVar)
 import Control.Monad.IO.Class (liftIO, MonadIO)
 import Control.Monad.Catch (throwM, catch)
 import Data.Pool (Pool)
+import Data.Text (Text)
 import qualified Data.Pool as Pool
 import qualified Network.AMQP as AMQP
 import Network.AMQP (Channel, AMQPException(..))
 import Control.Monad.Trans.Control (MonadBaseControl)
 
-data Connection =
-  Connection (MVar AMQP.Connection) (Pool Channel)
+type ExchangeName = Text
+
+
+data Connection = Connection
+  { amqpConn :: MVar AMQP.Connection
+  , pool :: Pool Channel
+  , exchange :: ExchangeName
+  }
 
 -- | Connect to the AMQP server.
 --
@@ -24,6 +32,9 @@ data Connection =
 --
 connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
 connect opts = liftIO $ do
+
+    -- use a default exchange name
+    let exchangeName = "amq.topic"
 
     -- create a single connection in an mvar
     cvar <- newEmptyMVar
@@ -33,7 +44,7 @@ connect opts = liftIO $ do
     chans <- Pool.createPool (create cvar) destroy numStripes openTime numChans
 
 
-    pure $ Connection cvar chans
+    pure $ Connection cvar chans exchangeName
   where
     numStripes = 1
     openTime = 10
@@ -66,14 +77,13 @@ connect opts = liftIO $ do
 
 
 disconnect :: MonadIO m => Connection -> m ()
-disconnect (Connection c p) = liftIO $ do
-    conn <- readMVar c
-    Pool.destroyAllResources p
+disconnect c = liftIO $ do
+    conn <- readMVar $ amqpConn c
+    Pool.destroyAllResources $ pool c
     AMQP.closeConnection conn
 
 
 
 withChannel :: MonadBaseControl IO m => Connection -> (Channel -> m b) -> m b
-withChannel (Connection _ p) action = do
+withChannel (Connection _ p _) action = do
     Pool.withResource p action
-

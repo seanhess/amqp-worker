@@ -12,9 +12,8 @@ import qualified Network.AMQP as AMQP
 
 import Network.AMQP.Worker.Key (Key, Routing, keyText)
 import Network.AMQP.Worker.Poll (poll)
-import Network.AMQP.Worker.Connection (Connection, withChannel)
+import Network.AMQP.Worker.Connection (Connection, withChannel, exchange)
 import Network.AMQP.Worker.Queue (Queue(..))
-import Network.AMQP.Worker.Exchange (Exchange(..), ExchangeName) 
 
 -- types --------------------------
 
@@ -46,11 +45,11 @@ jsonMessage a = newMsg
 
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
--- > publishToExchange conn "users.admin.created" (User "username")
-publishToExchange :: (ToJSON a, MonadIO m) => Connection -> ExchangeName -> Key Routing a -> a -> m ()
-publishToExchange conn exg rk msg =
+-- > publishToExchange conn (User "username")
+publishToExchange :: (ToJSON a, MonadIO m) => Connection -> Key Routing a -> a -> m ()
+publishToExchange conn rk msg =
   liftIO $ withChannel conn $ \chan -> do
-    _ <- AMQP.publishMsg chan exg (keyText rk) (jsonMessage msg)
+    _ <- AMQP.publishMsg chan (exchange conn) (keyText rk) (jsonMessage msg)
     return ()
 
 
@@ -58,9 +57,8 @@ publishToExchange conn exg rk msg =
 --
 -- > let queue = Worker.queue exchange "users" :: Queue User
 -- > publish conn queue (User "username")
-publish :: (ToJSON msg, MonadIO m) => Connection -> Exchange -> Key Routing msg -> msg -> m ()
-publish conn (Exchange exg) key =
-  publishToExchange conn exg key
+publish :: (ToJSON msg, MonadIO m) => Connection -> Key Routing msg -> msg -> m ()
+publish = publishToExchange
 
 
 -- | Check for a message once and attempt to parse it
