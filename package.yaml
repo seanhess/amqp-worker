@@ -1,5 +1,5 @@
 name:                amqp-worker
-version:             0.3.0
+version:             0.3.1
 github:              "seanhess/amqp-worker"
 license:             BSD3
 author:              "Sean Hess"
