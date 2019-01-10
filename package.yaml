@@ -25,6 +25,7 @@ dependencies:
   - bytestring
   - exceptions
   - data-default
+  - microlens
   - monad-control
   - monad-loops
   - mtl

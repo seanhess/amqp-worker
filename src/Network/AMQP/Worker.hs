@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 -- |
@@ -69,26 +68,35 @@
 module Network.AMQP.Worker
   (
   -- * Declaring Queues and Exchanges
-  -- , queue
-  -- , topicQueue
-  Queue(..)
-  -- , Direct, Topic
+    exchange
+  , ExchangeName
+  , queue
+  , Exchange(..)
+  , Queue(..)
+  , Defined
+  , Declared
+  , Direct
+  , Fanout
+  , Topic
+
+  -- * Configuring exchanges
+  , exchangeDurable
+  , exchangeAutoDelete
+  , exchangeVisibility
+
+  -- * Initializing exchanges and queues
+  , declareExchange
+  , declareQueue
+  , bindQueue
 
   -- * Connecting
   , Connection
   , connect
   , disconnect
-  , exchange
   , AMQP.fromURI
-
-  -- * Initializing exchanges and queues
-  , bindQueue
-  , direct
-  , topic
 
   -- * Sending Messages
   , publish
-  , publishToExchange
 
   -- * Reading Messages
   , consume
@@ -103,24 +111,12 @@ module Network.AMQP.Worker
   , WorkerOptions(..)
   , Microseconds
   , Default.def
-
-  -- * Routing Keys
-  , Key(..)
-  , Routing
-  , Binding(..)
-  , word, key, star, hash
-
-
-  -- * Monad
-  , MonadWorker(..)
   ) where
 
-import qualified Data.Default as Default
-import qualified Network.AMQP as AMQP
+import qualified Data.Default                   as Default
+import qualified Network.AMQP                   as AMQP
 
-import Network.AMQP.Worker.Key
-import Network.AMQP.Worker.Connection
-import Network.AMQP.Worker.Queue
-import Network.AMQP.Worker.Message
-import Network.AMQP.Worker.Worker
-import Network.AMQP.Worker.Monad (MonadWorker(..))
+import           Network.AMQP.Worker.Connection
+import           Network.AMQP.Worker.Entity
+import           Network.AMQP.Worker.Message
+import           Network.AMQP.Worker.Worker

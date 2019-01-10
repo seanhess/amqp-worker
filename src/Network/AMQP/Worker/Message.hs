@@ -1,25 +1,28 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 module Network.AMQP.Worker.Message where
 
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Base (liftBase)
-import Data.Aeson (ToJSON, FromJSON)
-import qualified Data.Aeson as Aeson
-import Data.ByteString.Lazy (ByteString)
-import Network.AMQP (newMsg, DeliveryMode(..), Ack(..))
-import qualified Network.AMQP as AMQP
+import           Control.Monad.Base             (liftBase)
+import           Control.Monad.IO.Class         (MonadIO (..))
+import           Data.Aeson                     (FromJSON, ToJSON)
+import qualified Data.Aeson                     as Aeson
+import           Data.ByteString.Lazy           (ByteString)
+import           Network.AMQP                   (Ack (..), DeliveryMode (..),
+                                                 QueueOpts (..), newMsg)
+import qualified Network.AMQP                   as AMQP
 
-import Network.AMQP.Worker.Key (Key, Routing, keyText)
-import Network.AMQP.Worker.Poll (poll)
-import Network.AMQP.Worker.Connection (Connection, withChannel, exchange)
-import Network.AMQP.Worker.Queue (Queue(..))
+import           Network.AMQP.Worker.Connection (Connection, withChannel)
+import           Network.AMQP.Worker.Entity     (Declared, Exchange (..),
+                                                 ExchangeName, ExchangeType,
+                                                 Queue (..), RoutingKey, getMsg,
+                                                 putMsg)
+import           Network.AMQP.Worker.Poll       (poll)
 
 -- types --------------------------
 
 -- | a parsed message from the queue
 data Message a = Message
-  { body :: ByteString
+  { body  :: ByteString
   , value :: a
   } deriving (Show, Eq)
 
@@ -41,25 +44,12 @@ jsonMessage a = newMsg
   , AMQP.msgDeliveryMode = Just Persistent
   }
 
-
-
--- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
---
--- > publishToExchange conn (User "username")
-publishToExchange :: (ToJSON a, MonadIO m) => Connection -> Key Routing a -> a -> m ()
-publishToExchange conn rk msg =
-  liftIO $ withChannel conn $ \chan -> do
-    _ <- AMQP.publishMsg chan (exchange conn) (keyText rk) (jsonMessage msg)
-    return ()
-
-
--- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
+-- | publish a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
 -- > let queue = Worker.queue exchange "users" :: Queue User
 -- > publish conn queue (User "username")
-publish :: (ToJSON msg, MonadIO m) => Connection -> Key Routing msg -> msg -> m ()
-publish = publishToExchange
-
+publish :: (ExchangeType exchangeType, ToJSON msg, MonadIO m) => Connection -> Exchange Declared exchangeType msg -> RoutingKey exchangeType -> msg -> m ()
+publish conn exchange filterKey = liftIO . putMsg conn exchange filterKey . jsonMessage
 
 -- | Check for a message once and attempt to parse it
 --
@@ -68,13 +58,11 @@ publish = publishToExchange
 -- >   Just (Parsed m) -> print m
 -- >   Just (Error e) -> putStrLn "could not parse message"
 -- >   Notihng -> putStrLn "No messages on the queue"
-consume :: (FromJSON msg, MonadIO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
-consume conn (Queue _ name) = do
-  mme <- liftIO $ withChannel conn $ \chan -> do
-            m <- liftBase $ AMQP.getMsg chan Ack name
-            pure m
+consume :: (FromJSON msg, MonadIO m) => Connection -> Queue Declared msg -> m (Maybe (ConsumeResult msg))
+consume conn queue = do
+  result <- liftIO $ getMsg conn queue
 
-  case mme of
+  case result of
     Nothing ->
       return Nothing
 
@@ -96,6 +84,6 @@ consume conn (Queue _ name) = do
 -- > case res of
 -- >   (Parsed m) -> print m
 -- >   (Error e) -> putStrLn "could not parse message"
-consumeNext :: (FromJSON msg, MonadIO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
-consumeNext pd conn key =
-    poll pd $ consume conn key
+consumeNext :: (FromJSON msg, MonadIO m) => Microseconds -> Connection -> Queue Declared msg -> m (ConsumeResult msg)
+consumeNext pd conn queue =
+    poll pd $ consume conn queue

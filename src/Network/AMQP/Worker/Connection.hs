@@ -1,29 +1,29 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Connection
-  ( Connection(..)
+  ( Connection
   , connect
   , disconnect
   , withChannel
   ) where
 
-import Control.Concurrent.MVar (MVar, putMVar, newEmptyMVar, readMVar, takeMVar)
-import Control.Monad.IO.Class (liftIO, MonadIO)
-import Control.Monad.Catch (throwM, catch)
-import Data.Pool (Pool)
-import Data.Text (Text)
-import qualified Data.Pool as Pool
-import qualified Network.AMQP as AMQP
-import Network.AMQP (Channel, AMQPException(..))
-import Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Concurrent.MVar     (MVar, newEmptyMVar, putMVar,
+                                              readMVar, takeMVar)
+import           Control.Monad.Catch         (catch, throwM)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Data.Pool                   (Pool)
+import qualified Data.Pool                   as Pool
+import           Data.Text                   (Text)
+import           Network.AMQP                (AMQPException (..), Channel)
+import qualified Network.AMQP                as AMQP
 
 type ExchangeName = Text
 
 
 data Connection = Connection
   { amqpConn :: MVar AMQP.Connection
-  , pool :: Pool Channel
-  , exchange :: ExchangeName
+  , pool     :: Pool Channel
   }
 
 -- | Connect to the AMQP server.
@@ -44,7 +44,7 @@ connect opts = liftIO $ do
     chans <- Pool.createPool (create cvar) destroy numStripes openTime numChans
 
 
-    pure $ Connection cvar chans exchangeName
+    pure $ Connection cvar chans
   where
     numStripes = 1
     openTime = 10
@@ -63,8 +63,7 @@ connect opts = liftIO $ do
 
     create cvar = do
       conn <- readMVar cvar
-      chan <- catch (AMQP.openChannel conn) (createEx cvar)
-      return chan
+      catch (AMQP.openChannel conn) (createEx cvar)
 
     createEx cvar (ConnectionClosedException _ _) = do
       reopenConnection cvar
@@ -72,8 +71,7 @@ connect opts = liftIO $ do
 
     createEx _ ex = throwM ex
 
-    destroy chan = do
-      AMQP.closeChannel chan
+    destroy = AMQP.closeChannel
 
 
 disconnect :: MonadIO m => Connection -> m ()
@@ -85,5 +83,4 @@ disconnect c = liftIO $ do
 
 
 withChannel :: MonadBaseControl IO m => Connection -> (Channel -> m b) -> m b
-withChannel (Connection _ p _) action = do
-    Pool.withResource p action
+withChannel (Connection _ p) = Pool.withResource p
