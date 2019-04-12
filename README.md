@@ -3,17 +3,22 @@ AMQP Worker
 
 Type-safe AMQP workers. Compatible with RabbitMQ
 
+    {-# LANGUAGE DeriveGeneric     #-}
     {-# LANGUAGE OverloadedStrings #-}
-    {-# LANGUAGE DeriveGeneric #-}
     module Main where
 
-    import Control.Concurrent (forkIO)
-    import Data.Aeson (FromJSON, ToJSON)
-    import qualified Data.Aeson as Aeson
-    import Data.Text (Text)
-    import GHC.Generics (Generic)
-    import qualified Network.AMQP.Worker as Worker
-    import Network.AMQP.Worker (fromURI, Exchange, Queue, Direct, WorkerException(..))
+    import           Control.Concurrent      (forkIO)
+    import           Control.Monad.Catch     (SomeException)
+    import           Data.Aeson              (FromJSON, ToJSON)
+    import           Data.Function           ((&))
+    import           Data.Text               (Text, pack)
+    import           GHC.Generics            (Generic)
+    import           Network.AMQP.Worker     (Connection, Message (..),
+                                              WorkerException, def, fromURI)
+    import qualified Network.AMQP.Worker     as Worker
+    import           Network.AMQP.Worker.Key
+    import           System.IO               (BufferMode (..), hSetBuffering,
+                                              stderr, stdout)
 
     data TestMessage = TestMessage
       { greeting :: Text }
@@ -23,49 +28,67 @@ Type-safe AMQP workers. Compatible with RabbitMQ
     instance ToJSON TestMessage
 
 
-    exchange :: Exchange
-    exchange = Worker.exchange "testExchange"
+    newMessages :: Key Routing TestMessage
+    newMessages = key "messages" & word "new"
 
+    results :: Key Routing Text
+    results = key "results"
 
-    queue :: Queue Direct TestMessage
-    queue = Worker.directQueue exchange "testQueue"
+    anyMessages :: Key Binding TestMessage
+    anyMessages = key "messages" & star
 
-
-    results :: Queue Direct Text
-    results = Worker.directQueue exchange "resultQueue"
 
 
     example :: IO ()
     example = do
+
+      -- connect
       conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
-      Worker.initQueue conn queue
-      Worker.initQueue conn results
+      let handleAnyMessages = Worker.topic anyMessages "handleAnyMessage"
 
-      Worker.publish conn queue (TestMessage "hello world")
+      -- initialize the queues
+      Worker.bindQueue conn (Worker.direct newMessages)
+      Worker.bindQueue conn (Worker.direct results)
 
-      forkIO $ Worker.worker conn queue onError $ \msg -> do
-        putStrLn ""
-        putStrLn "NEW MESSAGE"
-        print msg
-        Worker.publish conn results (greeting msg)
-        error "This will trigger an error"
+      -- topic queue!
+      Worker.bindQueue conn handleAnyMessages
 
-      -- normally you would only have one worker per program
-      -- but here we are showing how you can send results to the next queue
-      forkIO $ Worker.worker conn results onError $ \msg -> do
-        putStrLn ""
-        putStrLn "RESULT"
-        print msg
+      putStrLn "Enter a message"
+      msg <- getLine
 
-      -- close if the user hits any key
+      -- publish a message
+      putStrLn "Publishing a message"
+      Worker.publish conn newMessages (TestMessage $ pack msg)
+
+      -- create a worker, the program loops here
+      _ <- forkIO $ Worker.worker conn def (Worker.direct newMessages) onError (onMessage conn)
+      _ <- forkIO $ Worker.worker conn def (handleAnyMessages) onError (onMessage conn)
+
+      putStrLn "Press any key to exit"
       _ <- getLine
+      return ()
 
-      Worker.disconnect conn
 
-      where
-        onError body ex = do
-          putStrLn ""
-          putStrLn "Got an error"
-          print body
-          print ex
+
+
+    onMessage :: Connection -> Message TestMessage -> IO ()
+    onMessage conn m = do
+      let testMessage = value m
+      putStrLn "Got Message"
+      print testMessage
+      Worker.publish conn results (greeting testMessage)
+
+
+    onError :: WorkerException SomeException -> IO ()
+    onError e = do
+      putStrLn "Do something with errors"
+      print e
+
+
+
+    main :: IO ()
+    main = do
+      hSetBuffering stdout LineBuffering
+      hSetBuffering stderr LineBuffering
+      example

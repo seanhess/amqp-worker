@@ -13,15 +13,19 @@ import Network.AMQP.Worker.Connection (Connection, withChannel, exchange)
 
 
 
--- | Declare a queue. Queues support direct messaging: messages go to a queue with a specific name, where they persist until a worker consumes them. 
+-- | Declare a direct queue, which will receive messages published with the exact same routing key
 --
--- > queue :: Queue "testQueue" MyMessageType
--- > queue = Worker.queue exchange "testQueue"
+-- > newUsers :: Queue User
+-- > newUsers = Worker.direct (key "users" & word "new")
 
 direct :: Key Routing msg -> Queue msg
 direct key = Queue (bindingKey key) (keyText key)
 
 
+-- | Declare a topic queue, which will receive messages that match using wildcards
+--
+-- > anyUsers :: Queue User
+-- > anyUsers = Worker.topic "anyUsers" (key "users" & star)
 topic :: KeySegment a => Key a msg -> QueueName -> Queue msg
 topic key name = Queue (bindingKey key) name
 
@@ -34,14 +38,11 @@ data Queue msg =
 
 
 
--- | Queues must be created before you publish messages to them, or the messages will not be saved.
+-- | Queues must be bound before you publish messages to them, or the messages will not be saved.
 --
--- > let queue = Worker.queue exchange "my-queue" :: Queue Direct Text
+-- > let queue = Worker.direct (key "users" & word "new") :: Queue User
 -- > conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
--- > Worker.initQueue conn queue
-
-
-
+-- > Worker.bindQueue conn queue
 bindQueue :: (MonadIO m) => Connection -> Queue msg -> m ()
 bindQueue conn (Queue key name) =
   liftIO $ withChannel conn $ \chan -> do

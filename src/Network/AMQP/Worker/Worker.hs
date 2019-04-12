@@ -19,7 +19,7 @@ import Network.AMQP.Worker.Message (Message(..), ConsumeResult(..), ParseError(.
 -- | Create a worker which loops, checks for messages, and handles errors
 --
 -- > startWorker conn queue = do
--- >   Worker.worker def conn queue onError onMessage
+-- >   Worker.worker conn def queue onError onMessage
 -- >
 -- >   where
 -- >     onMessage :: Message User

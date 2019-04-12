@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 module Network.AMQP.Worker.Connection
   ( Connection(..)
@@ -7,29 +7,30 @@ module Network.AMQP.Worker.Connection
   , withChannel
   ) where
 
-import Control.Concurrent.MVar (MVar, putMVar, newEmptyMVar, readMVar, takeMVar)
-import Control.Monad.IO.Class (liftIO, MonadIO)
-import Control.Monad.Catch (throwM, catch)
-import Data.Pool (Pool)
-import Data.Text (Text)
-import qualified Data.Pool as Pool
-import qualified Network.AMQP as AMQP
-import Network.AMQP (Channel, AMQPException(..))
-import Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Concurrent.MVar     (MVar, newEmptyMVar, putMVar,
+                                              readMVar, takeMVar)
+import           Control.Monad.Catch         (catch, throwM)
+import           Control.Monad.IO.Class      (MonadIO, liftIO)
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Data.Pool                   (Pool)
+import qualified Data.Pool                   as Pool
+import           Data.Text                   (Text)
+import           Network.AMQP                (AMQPException (..), Channel)
+import qualified Network.AMQP                as AMQP
 
 type ExchangeName = Text
 
 
+-- | Internal connection details
 data Connection = Connection
   { amqpConn :: MVar AMQP.Connection
-  , pool :: Pool Channel
+  , pool     :: Pool Channel
   , exchange :: ExchangeName
   }
 
 -- | Connect to the AMQP server.
 --
 -- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
---
 connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
 connect opts = liftIO $ do
 
@@ -84,6 +85,7 @@ disconnect c = liftIO $ do
 
 
 
+-- | Perform an action with a channel resource
 withChannel :: MonadBaseControl IO m => Connection -> (Channel -> m b) -> m b
 withChannel (Connection _ p _) action = do
     Pool.withResource p action

@@ -45,7 +45,7 @@ jsonMessage a = newMsg
 
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
--- > publishToExchange conn (User "username")
+-- > publishToExchange conn key (User "username")
 publishToExchange :: (ToJSON a, MonadIO m) => Connection -> Key Routing a -> a -> m ()
 publishToExchange conn rk msg =
   liftIO $ withChannel conn $ \chan -> do
@@ -55,9 +55,8 @@ publishToExchange conn rk msg =
 
 -- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
--- > let queue = Worker.queue exchange "users" :: Queue User
--- > publish conn queue (User "username")
-publish :: (ToJSON msg, MonadIO m) => Connection -> Key Routing msg -> msg -> m ()
+-- > publish conn (key "users" :: Key Routing User) (User "username")
+publish :: (ToJSON a, MonadIO m) => Connection -> Key Routing a -> a -> m ()
 publish = publishToExchange
 
 
@@ -67,7 +66,7 @@ publish = publishToExchange
 -- > case res of
 -- >   Just (Parsed m) -> print m
 -- >   Just (Error e) -> putStrLn "could not parse message"
--- >   Notihng -> putStrLn "No messages on the queue"
+-- >   Nothing -> putStrLn "No messages on the queue"
 consume :: (FromJSON msg, MonadIO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ name) = do
   mme <- liftIO $ withChannel conn $ \chan -> do
