@@ -37,7 +37,7 @@ library:
   source-dirs: src
 
 executables:
-  example:
+  amqp-worker-example:
     main:                Example.hs
     source-dirs:         test
     ghc-options:
