@@ -93,8 +93,6 @@
 module Network.AMQP.Worker
     ( -- * Routing Keys
       Key (..)
-    , Routing
-    , Binding
     , word
     , key
     , star
@@ -109,8 +107,8 @@ module Network.AMQP.Worker
 
       -- * Initializing queues
     , Queue (..)
-    , direct
-    , topic
+    , queue
+    , queue'
     , bindQueue
 
       -- * Sending Messages

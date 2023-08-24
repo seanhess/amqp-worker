@@ -25,35 +25,38 @@ import System.IO
     , stdout
     )
 
-data TestMessage = TestMessage
+newtype TestMessage = TestMessage
     {greeting :: Text}
     deriving (Generic, Show, Eq)
 
 instance FromJSON TestMessage
 instance ToJSON TestMessage
 
-newMessages :: Key Routing TestMessage
+newMessages :: Key TestMessage
 newMessages = key "messages" & word "new"
 
-results :: Key Routing Text
-results = key "results"
-
-anyMessages :: Key Binding TestMessage
+anyMessages :: Key TestMessage
 anyMessages = key "messages" & star
+
+results :: Key Text
+results = key "results"
 
 example :: IO ()
 example = do
     -- connect
     conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
-    let handleAnyMessages = Worker.topic anyMessages "handleAnyMessage"
-
     -- initialize the queues
-    Worker.bindQueue conn (Worker.direct newMessages)
-    Worker.bindQueue conn (Worker.direct results)
+    -- this won't work because they are ALL the same queue in the end, no?
+    -- right... not 3 copies of it
+    msgq <- Worker.queue conn newMessages
+    msgq2 <- Worker.queue' conn "MSG2" newMessages
+    msgq3 <- Worker.queue' conn "MSG3" newMessages
 
     -- topic queue!
-    Worker.bindQueue conn handleAnyMessages
+    anyq <- Worker.queue conn anyMessages
+
+    resq <- Worker.queue conn results
 
     putStrLn "Enter a message"
     msg <- getLine
@@ -62,20 +65,27 @@ example = do
     putStrLn "Publishing a message"
     Worker.publish conn newMessages (TestMessage $ pack msg)
 
-    -- create a worker, the program loops here
-    _ <- forkIO $ Worker.worker conn def (Worker.direct newMessages) onError (onMessage conn)
-    _ <- forkIO $ Worker.worker conn def (handleAnyMessages) onError (onMessage conn)
+    -- Can I make it so you CAN'T define queues with the same name?
+    -- we can't just check
+    _ <- forkIO $ Worker.worker conn def msgq onError (onMessage "msg" conn)
+    _ <- forkIO $ Worker.worker conn def msgq2 onError (onMessage "msg2" conn)
+    _ <- forkIO $ Worker.worker conn def msgq3 onError (onMessage "msg3" conn)
+    _ <- forkIO $ Worker.worker conn def anyq onError (onMessage "any" conn)
+    _ <- forkIO $ Worker.worker conn def resq onError onResults
 
     putStrLn "Press any key to exit"
     _ <- getLine
     return ()
 
-onMessage :: Connection -> Message TestMessage -> IO ()
-onMessage conn m = do
+onMessage :: String -> Connection -> Message TestMessage -> IO ()
+onMessage name conn m = do
     let testMessage = value m
-    putStrLn "Got Message"
-    print testMessage
+    putStrLn $ name <> " << " <> show testMessage
     Worker.publish conn results (greeting testMessage)
+
+onResults :: Message Text -> IO ()
+onResults m = do
+    putStrLn $ "res << " <> show (value m)
 
 onError :: WorkerException SomeException -> IO ()
 onError e = do

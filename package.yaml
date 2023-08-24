@@ -1,37 +1,31 @@
 name:                amqp-worker
 version:             0.4.0
 github:              "seanhess/amqp-worker"
-license:             BSD3
 author:              "Sean Hess"
 maintainer:          "seanhess@gmail.com"
 copyright:           "Orbital Labs"
 
 extra-source-files:
 - README.md
+- CHANGELOG.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
+synopsis:            Type-safe AMQP workers
+category:            Network
 
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
 description:         Please see the README on GitHub at <https://github.com/seanhess/amqp-worker#readme>
 
 dependencies:
   - base >=4.9 && <5
-  - aeson
-  - amqp
-  - bytestring
-  - exceptions
-  - data-default
-  - monad-control
-  - monad-loops
-  - mtl
-  - resource-pool >= 0.3
-  - split
-  - text
-  - transformers-base
+  - aeson >=2.0 && <2.3
+  - amqp >=0.20 && <1
+  - bytestring >=0.11 && <0.12
+  - exceptions >=0.10 && <0.11
+  - data-default >=0.7 && <0.8
+  - monad-loops >=0.4 && <0.5
+  - mtl >=2.2 && <2.3
+  - resource-pool >=0.3 && <0.5
+  - text >=1.2 && <1.3
+  - transformers-base >=0.4 && <0.5
 
 library:
   source-dirs: src

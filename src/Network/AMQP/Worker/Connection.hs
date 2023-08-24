@@ -17,7 +17,7 @@ import Control.Concurrent.MVar
     )
 import Control.Monad.Catch (catch, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Control.Monad.Trans.Control (MonadBaseControl)
+import Data.Function ((&))
 import Data.Pool (Pool)
 import qualified Data.Pool as Pool
 import Data.Text (Text)
@@ -45,14 +45,19 @@ connect opts = liftIO $ do
     cvar <- newEmptyMVar
     openConnection cvar
 
-    let config = Pool.defaultPoolConfig (create cvar) destroy openTime numChans
-
     -- open a shared pool for channels
-    chans <- Pool.newPool config
+    chans <- Pool.newPool (config cvar)
 
     pure $ Connection cvar chans exchangeName
   where
+    config cvar =
+        Pool.defaultPoolConfig (create cvar) destroy openTime numChans
+            & Pool.setNumStripes (Just 1)
+
+    openTime :: Double
     openTime = 10
+
+    numChans :: Int
     numChans = 4
 
     openConnection cvar = do
