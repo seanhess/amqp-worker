@@ -19,10 +19,12 @@ data Queue msg
 
 -- | Create a queue and bind it, allowing it to receive messages. The queue name
 -- defaults to the key
+-- TODO: usage
 queue :: (MonadIO m) => Connection -> Key msg -> m (Queue msg)
 queue conn key = queue' conn (keyText key) key
 
 -- | Create a queue and specify the name (Naming things is hard! Just use the default)
+-- TODO: usage
 queue' :: (MonadIO m) => Connection -> QueueName -> Key msg -> m (Queue msg)
 queue' conn name key = do
     let q = Queue key name
@@ -30,11 +32,7 @@ queue' conn name key = do
     return q
 
 -- | Queues must be bound before you publish messages to them, or the messages will not be saved.
--- Use topicQueue or directQueue instead
---
--- > let queue = Worker.direct (key "users" & word "new") :: Queue User
--- > conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
--- > Worker.bindQueue conn queue
+-- Use `queue` or `queue'` instead
 bindQueue :: (MonadIO m) => Connection -> Queue msg -> m ()
 bindQueue conn (Queue key name) =
     liftIO $ withChannel conn $ \chan -> do

@@ -102,23 +102,18 @@ module Network.AMQP.Worker
     , Connection
     , connect
     , disconnect
-    , exchange
     , AMQP.fromURI
 
       -- * Initializing queues
     , Queue (..)
     , queue
     , queue'
-    , bindQueue
 
       -- * Sending Messages
     , publish
     , publishToExchange
 
       -- * Reading Messages
-    , consume
-    , consumeNext
-    , ConsumeResult (..)
     , ParseError (..)
     , Message (..)
 

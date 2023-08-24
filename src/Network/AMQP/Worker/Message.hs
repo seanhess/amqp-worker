@@ -3,7 +3,6 @@
 
 module Network.AMQP.Worker.Message where
 
-import Control.Monad.Base (liftBase)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Aeson as Aeson
@@ -30,8 +29,6 @@ data ConsumeResult a
     | Error ParseError
 
 data ParseError = ParseError String ByteString
-
-type Microseconds = Int
 
 jsonMessage :: ToJSON a => a -> AMQP.Message
 jsonMessage a =
@@ -67,7 +64,7 @@ publish = publishToExchange
 consume :: (FromJSON msg, MonadIO m) => Connection -> Queue msg -> m (Maybe (ConsumeResult msg))
 consume conn (Queue _ name) = do
     mme <- liftIO $ withChannel conn $ \chan -> do
-        m <- liftBase $ AMQP.getMsg chan Ack name
+        m <- AMQP.getMsg chan Ack name
         pure m
 
     case mme of
@@ -91,3 +88,5 @@ consume conn (Queue _ name) = do
 consumeNext :: (FromJSON msg, MonadIO m) => Microseconds -> Connection -> Queue msg -> m (ConsumeResult msg)
 consumeNext pd conn key =
     poll pd $ consume conn key
+
+type Microseconds = Int
