@@ -1,5 +1,8 @@
 .stack-work
+dist-newstyle/
 notes.md
 dist
 .DS_Store
 *.cabal
+tags
+cabal.project.local

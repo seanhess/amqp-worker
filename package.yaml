@@ -1,5 +1,5 @@
 name:                amqp-worker
-version:             0.3.2
+version:             0.4.0
 github:              "seanhess/amqp-worker"
 license:             BSD3
 author:              "Sean Hess"
@@ -16,7 +16,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/seanhess/server#readme>
+description:         Please see the README on GitHub at <https://github.com/seanhess/amqp-worker#readme>
 
 dependencies:
   - base >=4.9 && <5
@@ -28,7 +28,7 @@ dependencies:
   - monad-control
   - monad-loops
   - mtl
-  - resource-pool
+  - resource-pool >= 0.3
   - split
   - text
   - transformers-base
@@ -39,7 +39,7 @@ library:
 executables:
   example:
     main:                Example.hs
-    source-dirs:         test
+    source-dirs:         example
     ghc-options:
     - -threaded
     - -rtsopts
@@ -58,4 +58,4 @@ tests:
     - -with-rtsopts=-N
     - -Wall
     dependencies:
-    - server
+    - amqp-worker

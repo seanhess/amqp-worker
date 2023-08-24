@@ -1,29 +1,28 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Network.AMQP.Worker.Key
-  ( Key(..)
-  , Binding(..)
-  , BindingWord
-  , Routing
-  , key
-  , word, star, hash
-  , keyText
-  , KeySegment(..)
-  , bindingKey
-  ) where
 
+module Network.AMQP.Worker.Key
+    ( Key (..)
+    , Binding (..)
+    , BindingWord
+    , Routing
+    , key
+    , word
+    , star
+    , hash
+    , keyText
+    , KeySegment (..)
+    , bindingKey
+    ) where
+
+import qualified Data.List as List
 import Data.Text (Text)
 import qualified Data.Text as Text
-import qualified Data.List as List
-
-
-
 
 -- | Keys describe routing and binding info for a message
 newtype Key a msg = Key [a]
-  deriving (Eq, Show, Semigroup, Monoid)
-
+    deriving (Eq, Show, Semigroup, Monoid)
 
 -- | Every message is sent with a specific routing key
 --
@@ -33,11 +32,9 @@ newtype Routing = Routing Text
     deriving (Eq, Show)
 
 instance KeySegment Routing where
-  toText (Routing s) = s
-  fromText = Routing
-  toBind (Routing s) = Word s
-
-
+    toText (Routing s) = s
+    fromText = Routing
+    toBind (Routing s) = Word s
 
 -- | A dynamic binding address for topic queues
 --
@@ -49,7 +46,6 @@ data Binding
     | Hash
     deriving (Eq, Show)
 
-
 instance KeySegment Binding where
     toText (Word t) = t
     toText Star = "*"
@@ -57,29 +53,18 @@ instance KeySegment Binding where
     fromText = Word
     toBind = id
 
-
-
 class KeySegment a where
-    toText   :: a -> Text
+    toText :: a -> Text
     fromText :: Text -> a
     toBind :: a -> Binding
-
-
-
-
-
-
 
 keyText :: KeySegment a => Key a msg -> Text
 keyText (Key ns) =
     Text.intercalate "." . List.map toText $ ns
 
-
 -- | Convert any key to a binding key
 bindingKey :: KeySegment a => Key a msg -> Key Binding msg
 bindingKey (Key rs) = Key (map toBind rs)
-
-
 
 -- | Match any one word
 star :: KeySegment a => Key a msg -> Key Binding msg
@@ -96,8 +81,5 @@ word w (Key ws) = Key $ ws ++ [fromText w]
 -- | Create a new key
 key :: Text -> Key Routing msg
 key t = Key [Routing t]
-
-
-
 
 type BindingWord = Text

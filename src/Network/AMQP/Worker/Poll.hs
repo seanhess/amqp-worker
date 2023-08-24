@@ -11,7 +11,7 @@ poll :: (MonadIO m) => Int -> m (Maybe a) -> m a
 poll us action = untilJust $ do
     ma <- action
     case ma of
-      Just a -> return $ Just a
-      Nothing -> do
-        liftIO $ threadDelay us
-        return Nothing
+        Just a -> return $ Just a
+        Nothing -> do
+            liftIO $ threadDelay us
+            return Nothing
