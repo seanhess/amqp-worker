@@ -15,6 +15,7 @@ import Network.AMQP.Worker
     , WorkerException
     , def
     , fromURI
+    , queueName
     )
 import qualified Network.AMQP.Worker as Worker
 import Network.AMQP.Worker.Key
@@ -46,17 +47,19 @@ example = do
     -- connect
     conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
 
-    -- initialize the queues
-    -- this won't work because they are ALL the same queue in the end, no?
-    -- right... not 3 copies of it
-    msgq <- Worker.queue conn newMessages
-    msgq2 <- Worker.queue' conn "MSG2" newMessages
-    msgq3 <- Worker.queue' conn "MSG3" newMessages
+    -- TODO: document what happens when you use the same name
+    -- TODO: document how to create fanouts vs single-consumer
+    -- vs load balancing. This supports all use-cases I can think of
 
-    -- topic queue!
-    anyq <- Worker.queue conn anyMessages
+    msgq1 <- Worker.queue' conn newMessages
+    msgq2 <- Worker.queue conn (queueName "msg2" newMessages) newMessages
 
-    resq <- Worker.queue conn results
+    -- queues with the same name are equivalent
+
+    -- This queue listens for anything under `messages.`
+    anyq <- Worker.queue' conn anyMessages
+
+    resq <- Worker.queue' conn results
 
     putStrLn "Enter a message"
     msg <- getLine
@@ -67,9 +70,10 @@ example = do
 
     -- Can I make it so you CAN'T define queues with the same name?
     -- we can't just check
-    _ <- forkIO $ Worker.worker conn def msgq onError (onMessage "msg" conn)
+    _ <- forkIO $ Worker.worker conn def msgq1 onError (onMessage "msg1" conn)
     _ <- forkIO $ Worker.worker conn def msgq2 onError (onMessage "msg2" conn)
-    _ <- forkIO $ Worker.worker conn def msgq3 onError (onMessage "msg3" conn)
+    -- _ <- forkIO $ Worker.worker conn def msgq2 onError (onMessage "msg2" conn)
+    -- _ <- forkIO $ Worker.worker conn def msgq3 onError (onMessage "msg3" conn)
     _ <- forkIO $ Worker.worker conn def anyq onError (onMessage "any" conn)
     _ <- forkIO $ Worker.worker conn def resq onError onResults
 

@@ -9,7 +9,6 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import Network.AMQP (Ack (..), DeliveryMode (..), newMsg)
 import qualified Network.AMQP as AMQP
-
 import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
 import Network.AMQP.Worker.Key (Key, keyText)
 import Network.AMQP.Worker.Poll (poll)

@@ -108,6 +108,7 @@ module Network.AMQP.Worker
     , Queue (..)
     , queue
     , queue'
+    , queueName
 
       -- * Sending Messages
     , publish
