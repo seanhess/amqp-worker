@@ -89,7 +89,7 @@ balance conn = do
 -- | You can bind to messages dynamically with wildcards in Binding Keys
 dynamic :: Connection -> IO ()
 dynamic conn = do
-    -- \| anyGreetings matches `greetings.*`
+    -- anyGreetings matches `greetings.*`
     q <- Worker.queue conn def anyGreetings
 
     -- You can only publish to a Routing Key. Publishing to anyGreetings will give a compile error
