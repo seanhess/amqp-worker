@@ -106,8 +106,10 @@ module Network.AMQP.Worker
 
       -- * Initializing queues
     , Queue (..)
+    , QueueName
+    , QueuePrefix (..)
     , queue
-    , queue'
+    , queueNamed
     , queueName
 
       -- * Sending Messages
