@@ -2,96 +2,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
+-- Module:      Network.AMQP.Worker
+-- Copyright:   (c) 2023 Sean Hess
+-- License:     BSD3
+-- Maintainer:  Sean Hess <seanhess@gmail.com>
+-- Stability:   experimental
+-- Portability: portable
 --
--- High level functions for working with message queues. Built on top of Network.AMQP. See https://hackage.haskell.org/package/amqp, which only works with RabbitMQ: https://www.rabbitmq.com/
---
--- /Example/:
---
--- Connect to a server, initialize a queue, publish a message, and create a worker to process them.
---
--- > {-# LANGUAGE DeriveGeneric     #-}
--- > {-# LANGUAGE OverloadedStrings #-}
--- > module Main where
--- >
--- > import           Control.Concurrent      (forkIO)
--- > import           Control.Monad.Catch     (SomeException)
--- > import           Data.Aeson              (FromJSON, ToJSON)
--- > import           Data.Function           ((&))
--- > import           Data.Text               (Text, pack)
--- > import           GHC.Generics            (Generic)
--- > import           Network.AMQP.Worker     (Connection, Message (..),
--- >                                           WorkerException, def, fromURI)
--- > import qualified Network.AMQP.Worker     as Worker
--- > import           Network.AMQP.Worker.Key
--- > import           System.IO               (BufferMode (..), hSetBuffering,
--- >                                           stderr, stdout)
--- >
--- > data TestMessage = TestMessage
--- >   { greeting :: Text }
--- >   deriving (Generic, Show, Eq)
--- >
--- > instance FromJSON TestMessage
--- > instance ToJSON TestMessage
--- >
--- >
--- > newMessages :: Key Routing TestMessage
--- > newMessages = key "messages" & word "new"
--- >
--- > results :: Key Routing Text
--- > results = key "results"
--- >
--- > anyMessages :: Key Binding TestMessage
--- > anyMessages = key "messages" & star
--- >
--- >
--- >
--- > example :: IO ()
--- > example = do
--- >
--- >   -- connect
--- >   conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
--- >
--- >   let handleAnyMessages = Worker.topic anyMessages "handleAnyMessage"
--- >
--- >   -- initialize the queues
--- >   Worker.bindQueue conn (Worker.direct newMessages)
--- >   Worker.bindQueue conn (Worker.direct results)
--- >
--- >   -- topic queue!
--- >   Worker.bindQueue conn handleAnyMessages
--- >
--- >   putStrLn "Enter a message"
--- >   msg <- getLine
--- >
--- >   -- publish a message
--- >   putStrLn "Publishing a message"
--- >   Worker.publish conn newMessages (TestMessage $ pack msg)
--- >
--- >   -- create a worker, the program loops here
--- >   _ <- forkIO $ Worker.worker conn def (Worker.direct newMessages) onError (onMessage conn)
--- >   _ <- forkIO $ Worker.worker conn def (handleAnyMessages) onError (onMessage conn)
--- >
--- >   putStrLn "Press any key to exit"
--- >   _ <- getLine
--- >   return ()
--- >
--- >
--- > onMessage :: Connection -> Message TestMessage -> IO ()
--- > onMessage conn m = do
--- >   let testMessage = value m
--- >   putStrLn "Got Message"
--- >   print testMessage
--- >   Worker.publish conn results (greeting testMessage)
--- >
--- >
--- > onError :: WorkerException SomeException -> IO ()
--- > onError e = do
--- >   putStrLn "Do something with errors"
--- >   print e
--- >
--- >
+-- Type safe and simplified message queues with AMQP
 module Network.AMQP.Worker
-    ( -- * Binding and Routing Keys
+    ( -- * How to use this library
+      -- $use
+
+      -- * Binding and Routing Keys
       Key (..)
     , Binding
     , Routing
@@ -101,24 +24,22 @@ module Network.AMQP.Worker
     , many
 
       -- * Connecting
-    , Connection
     , connect
-    , disconnect
     , AMQP.fromURI
-
-      -- * Initializing queues
-    , Queue (..)
-    , QueueName
-    , QueuePrefix (..)
-    , queue
-    , queueNamed
-    , queueName
+    , Connection
 
       -- * Sending Messages
     , publish
-    , publishToExchange
 
-      -- * Reading Messages
+      -- * Initializing queues
+    , queue
+    , queueNamed
+    , Queue (..)
+    , queueName
+    , QueueName
+    , QueuePrefix (..)
+
+      -- * Messages
     , ParseError (..)
     , Message (..)
 
@@ -138,3 +59,38 @@ import Network.AMQP.Worker.Key
 import Network.AMQP.Worker.Message
 import Network.AMQP.Worker.Queue
 import Network.AMQP.Worker.Worker
+
+-- $use
+--
+-- Define keys to identify how messages will be published and what the message type is
+--
+-- > import Network.AMQP.Worker as Worker
+-- >
+-- > data Greeting = Greeting
+-- >   { message :: Text }
+-- >   deriving (Generic, Show, Eq)
+-- >
+-- > instance FromJSON Greeting
+-- > instance ToJSON Greeting
+-- >
+-- > newGreetings :: Key Routing Greeting
+-- > newGreetings = key "messages" & word "greetings" & word "new"
+--
+-- Connect to AMQP and publish a message
+--
+-- >   conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+-- >
+-- >   Worker.publish conn newMessages $ TestMessage "hello"
+--
+-- To receive messages, first define a queue. You can bind direclty to the Routing Key to ensure it is delivered once
+--
+-- >   q <- Worker.queue conn def newMessages :: IO (Queue Greeting)
+-- >
+-- >   -- Loop and print any values received
+-- >   Worker.worker conn def q onError (print . value)
+--
+-- You can also define dynamic Routing Keys to receive many kinds of messages
+--
+-- >   let newMessages = key "messages" & any1 & word "new"
+-- >   q <- Worker.queue conn def newMessages :: IO (Queue Greeting)
+-- >

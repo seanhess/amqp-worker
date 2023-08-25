@@ -3,18 +3,14 @@
 
 module Network.AMQP.Worker.Connection
     ( Connection (..)
+    , AMQP.ConnectionOpts (..)
+    , AMQP.defaultConnectionOpts
     , connect
     , disconnect
     , withChannel
     ) where
 
-import Control.Concurrent.MVar
-    ( MVar
-    , newEmptyMVar
-    , putMVar
-    , readMVar
-    , takeMVar
-    )
+import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar, takeMVar)
 import Control.Monad.Catch (catch, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Function ((&))
@@ -26,7 +22,6 @@ import qualified Network.AMQP as AMQP
 
 type ExchangeName = Text
 
--- | Internal connection details
 data Connection = Connection
     { amqpConn :: MVar AMQP.Connection
     , pool :: Pool Channel
@@ -35,7 +30,7 @@ data Connection = Connection
 
 -- | Connect to the AMQP server.
 --
--- >>> conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
+-- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
 connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
 connect opts = liftIO $ do
     -- use a default exchange name
@@ -51,14 +46,14 @@ connect opts = liftIO $ do
     pure $ Connection cvar chans exchangeName
   where
     config cvar =
-        Pool.defaultPoolConfig (create cvar) destroy openTime numChans
+        Pool.defaultPoolConfig (create cvar) destroy openTime maxChans
             & Pool.setNumStripes (Just 1)
 
     openTime :: Double
     openTime = 10
 
-    numChans :: Int
-    numChans = 4
+    maxChans :: Int
+    maxChans = 8
 
     openConnection cvar = do
         -- open a connection and store in the mvar
@@ -89,7 +84,7 @@ disconnect c = liftIO $ do
     Pool.destroyAllResources $ pool c
     AMQP.closeConnection conn
 
--- | Perform an action with a channel resource
+-- | Perform an action with a channel resource, and give it back at the end
 withChannel :: Connection -> (Channel -> IO b) -> IO b
 withChannel (Connection _ p _) action = do
     Pool.withResource p action

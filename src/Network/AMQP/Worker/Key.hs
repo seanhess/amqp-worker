@@ -27,17 +27,22 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.TypeLits (ErrorMessage (..), TypeError)
 
--- | Keys describe routing and binding info for a message
-newtype Key a msg = Key [Binding]
-    deriving (Eq, Show, Semigroup, Monoid)
-
--- | Routing keys have no dynamic component and can be used to publish messages
-data Routing
-
--- | Binding keys are similar, except used for matching messages. They can contain * and #
+-- | Messages are published with a specific identifier called a Routing key. Queues can use Binding Keys to control which messages are delivered to them.
+--
+-- Routing keys have no dynamic component and can be used to publish messages
+--
+-- > commentsKey :: Key Routing Comment
+-- > commentsKey = key "posts" & word "new"
+--
+-- Binding keys can contain wildcards, only used for matching messages
 --
 -- > commentsKey :: Key Binding Comment
 -- > commentsKey = key "posts" & any1 & word "comments" & many
+newtype Key a msg = Key [Binding]
+    deriving (Eq, Show, Semigroup, Monoid)
+
+data Routing
+
 data Binding
     = Word Text
     | Any
@@ -68,7 +73,7 @@ many (Key ws) = Key (ws ++ [Many])
 word :: Text -> Key a msg -> Key a msg
 word w (Key ws) = Key $ ws ++ [toBind w]
 
--- | Start a new routing key (can be used for bindings)
+-- | Start a new routing key (can also be used for bindings)
 key :: Text -> Key Routing msg
 key t = Key [Word t]
 
@@ -76,7 +81,7 @@ key t = Key [Word t]
 toBindingKey :: Key a msg -> Key Binding msg
 toBindingKey (Key ws) = Key ws
 
--- | Custom error message
+-- | Custom error message when trying to publish to Binding keys
 type family RequireRouting (a :: Type) :: Constraint where
     RequireRouting Binding =
         TypeError

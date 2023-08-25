@@ -26,8 +26,10 @@ data Queue msg
     = Queue (Key Binding msg) QueueName
     deriving (Show, Eq)
 
--- | Create a queue to receive messages matching the 'Key' with a name prefixed
--- via `queueName`
+-- | Create a queue to receive messages matching the 'Key' with a name prefixed via `queueName`.
+--
+-- > q <- Worker.queue conn "main" $ key "messages" & any1
+-- > Worker.worker conn def q onError onMessage
 queue :: (MonadIO m) => Connection -> QueuePrefix -> Key a msg -> m (Queue msg)
 queue conn pre key = do
     queueNamed conn (queueName pre key) key
@@ -43,6 +45,7 @@ queueNamed conn name key = do
 
 -- | Name a queue with a prefix and the binding key name. Useful for seeing at
 -- a glance which queues are receiving which messages
+--
 -- > -- "main messages.new"
 -- > queueName "main" (key "messages" & word "new")
 queueName :: QueuePrefix -> Key a msg -> QueueName

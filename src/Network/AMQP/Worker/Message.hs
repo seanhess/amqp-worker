@@ -50,7 +50,14 @@ publishToExchange conn rk msg =
 
 -- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
--- > publish conn (key "users" :: Key Routing User) (User "username")
+-- > let key = key "users" :: Key Routing User
+-- > publish conn key (User "username")
+--
+-- Publishing to a Binding Key results in an error
+--
+-- > -- Compiler error! This doesn't make sense
+-- > let key = key "users" & many :: Key Binding User
+-- > publish conn key (User "username")
 publish :: (RequireRouting a, ToJSON msg, MonadIO m) => Connection -> Key a msg -> msg -> m ()
 publish = publishToExchange
 
