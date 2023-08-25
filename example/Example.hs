@@ -11,25 +11,20 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.AMQP.Worker
 import qualified Network.AMQP.Worker as Worker
-import System.IO
-    ( BufferMode (..)
-    , hSetBuffering
-    , stderr
-    , stdout
-    )
+import System.IO (BufferMode (..), hSetBuffering, stderr, stdout)
 
-newtype TestMessage = TestMessage
-    {greeting :: Text}
+newtype Greeting = Greeting
+    {message :: Text}
     deriving (Generic, Show, Eq)
 
-instance FromJSON TestMessage
-instance ToJSON TestMessage
+instance FromJSON Greeting
+instance ToJSON Greeting
 
-newMessages :: Key Routing TestMessage
-newMessages = key "messages" & word "new"
+newGreetings :: Key Routing Greeting
+newGreetings = key "greetings" & word "new"
 
-anyMessages :: Key Binding TestMessage
-anyMessages = key "messages" & any1
+anyGreetings :: Key Binding Greeting
+anyGreetings = key "greetings" & any1
 
 example :: IO ()
 example = do
@@ -38,19 +33,19 @@ example = do
 
 publishing :: Connection -> IO ()
 publishing conn = do
-    Worker.publish conn newMessages $ TestMessage "Hello"
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
 -- | Create a queue to process messages
 simple :: Connection -> IO ()
 simple conn = do
     -- create a queue to receive them
-    q <- Worker.queue conn def newMessages
+    q <- Worker.queue conn def newGreetings
 
     -- publish a message (delivered to queue)
-    Worker.publish conn newMessages $ TestMessage "Hello"
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
-    -- We cannot publish to anyMessages because it is a binding key (with wildcards in it)
-    -- Worker.publish conn anyMessages $ TestMessage "Compiler Error"
+    -- We cannot publish to anyGreetings because it is a binding key (with wildcards in it)
+    -- Worker.publish conn anyGreetings $ TestMessage "Compiler Error"
 
     -- Loop and print any values received
     Worker.worker conn def q onError (print . value)
@@ -59,11 +54,11 @@ simple conn = do
 multiple :: Connection -> IO ()
 multiple conn = do
     -- create two separate queues
-    one <- Worker.queue conn "one" newMessages
-    two <- Worker.queue conn "two" newMessages
+    one <- Worker.queue conn "one" newGreetings
+    two <- Worker.queue conn "two" newGreetings
 
     -- publish a message (delivered to both)
-    Worker.publish conn newMessages $ TestMessage "Hello"
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
     -- Each of these workers will receive the same message
     _ <- forkIO $ Worker.worker conn def one onError $ \m -> putStrLn "one" >> print (value m)
@@ -77,11 +72,11 @@ multiple conn = do
 balance :: Connection -> IO ()
 balance conn = do
     -- create a single queue
-    q <- Worker.queue conn def newMessages
+    q <- Worker.queue conn def newGreetings
 
     -- publish two messages
-    Worker.publish conn newMessages $ TestMessage "Hello1"
-    Worker.publish conn newMessages $ TestMessage "Hello2"
+    Worker.publish conn newGreetings $ Greeting "Hello1"
+    Worker.publish conn newGreetings $ Greeting "Hello2"
 
     -- Each worker will receive one of the messages
     _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "one" >> print (value m)
@@ -94,12 +89,13 @@ balance conn = do
 -- | You can bind to messages dynamically with wildcards in Binding Keys
 dynamic :: Connection -> IO ()
 dynamic conn = do
-    -- \| anyMessages matches `messages.*`
-    q <- Worker.queue conn def anyMessages
+    -- \| anyGreetings matches `greetings.*`
+    q <- Worker.queue conn def anyGreetings
 
-    Worker.publish conn newMessages $ TestMessage "Hello"
+    -- You can only publish to a Routing Key. Publishing to anyGreetings will give a compile error
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
-    -- This queue listens for anything under `messages.`
+    -- This queue listens for anything under `greetings.`
     Worker.worker conn def q onError $ \m -> putStrLn "Got: " >> print (value m)
 
 onError :: WorkerException SomeException -> IO ()

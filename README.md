@@ -3,92 +3,120 @@ AMQP Worker
 
 Type-safe AMQP workers. Compatible with RabbitMQ
 
-    {-# LANGUAGE DeriveGeneric     #-}
-    {-# LANGUAGE OverloadedStrings #-}
-    module Main where
+```haskell
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-    import           Control.Concurrent      (forkIO)
-    import           Control.Monad.Catch     (SomeException)
-    import           Data.Aeson              (FromJSON, ToJSON)
-    import           Data.Function           ((&))
-    import           Data.Text               (Text, pack)
-    import           GHC.Generics            (Generic)
-    import           Network.AMQP.Worker     (Connection, Message (..),
-                                              WorkerException, def, fromURI)
-    import qualified Network.AMQP.Worker     as Worker
-    import           Network.AMQP.Worker.Key
-    import           System.IO               (BufferMode (..), hSetBuffering,
-                                              stderr, stdout)
+module Main where
 
-    data TestMessage = TestMessage
-      { greeting :: Text }
-      deriving (Generic, Show, Eq)
+import Control.Concurrent (forkIO)
+import Control.Monad.Catch (SomeException)
+import Data.Aeson (FromJSON, ToJSON)
+import Data.Function ((&))
+import Data.Text (Text)
+import GHC.Generics (Generic)
+import Network.AMQP.Worker
+import qualified Network.AMQP.Worker as Worker
+import System.IO (BufferMode (..), hSetBuffering, stderr, stdout)
 
-    instance FromJSON TestMessage
-    instance ToJSON TestMessage
+newtype Greeting = Greeting
+    {message :: Text}
+    deriving (Generic, Show, Eq)
 
+instance FromJSON Greeting
+instance ToJSON Greeting
 
-    newMessages :: Key Routing TestMessage
-    newMessages = key "messages" & word "new"
+newGreetings :: Key Routing Greeting
+newGreetings = key "greetings" & word "new"
 
-    results :: Key Routing Text
-    results = key "results"
+anyGreetings :: Key Binding Greeting
+anyGreetings = key "greetings" & any1
 
-    anyMessages :: Key Binding TestMessage
-    anyMessages = key "messages" & star
+example :: IO ()
+example = do
+    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    simple conn
 
+publishing :: Connection -> IO ()
+publishing conn = do
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
+-- | Create a queue to process messages
+simple :: Connection -> IO ()
+simple conn = do
+    -- create a queue to receive them
+    q <- Worker.queue conn def newGreetings
 
-    example :: IO ()
-    example = do
+    -- publish a message (delivered to queue)
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
-      -- connect
-      conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    -- We cannot publish to anyGreetings because it is a binding key (with wildcards in it)
+    -- Worker.publish conn anyGreetings $ TestMessage "Compiler Error"
 
-      let handleAnyMessages = Worker.topic anyMessages "handleAnyMessage"
+    -- Loop and print any values received
+    Worker.worker conn def q onError (print . value)
 
-      -- initialize the queues
-      Worker.bindQueue conn (Worker.direct newMessages)
-      Worker.bindQueue conn (Worker.direct results)
+-- | Multiple queues with distinct names will each get copies of published messages
+multiple :: Connection -> IO ()
+multiple conn = do
+    -- create two separate queues
+    one <- Worker.queue conn "one" newGreetings
+    two <- Worker.queue conn "two" newGreetings
 
-      -- topic queue!
-      Worker.bindQueue conn handleAnyMessages
+    -- publish a message (delivered to both)
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
-      putStrLn "Enter a message"
-      msg <- getLine
+    -- Each of these workers will receive the same message
+    _ <- forkIO $ Worker.worker conn def one onError $ \m -> putStrLn "one" >> print (value m)
+    _ <- forkIO $ Worker.worker conn def two onError $ \m -> putStrLn "two" >> print (value m)
 
-      -- publish a message
-      putStrLn "Publishing a message"
-      Worker.publish conn newMessages (TestMessage $ pack msg)
+    putStrLn "Press any key to exit"
+    _ <- getLine
+    return ()
 
-      -- create a worker, the program loops here
-      _ <- forkIO $ Worker.worker conn def (Worker.direct newMessages) onError (onMessage conn)
-      _ <- forkIO $ Worker.worker conn def (handleAnyMessages) onError (onMessage conn)
+-- | Create multiple workers on the same queue to load balance between them
+balance :: Connection -> IO ()
+balance conn = do
+    -- create a single queue
+    q <- Worker.queue conn def newGreetings
 
-      putStrLn "Press any key to exit"
-      _ <- getLine
-      return ()
+    -- publish two messages
+    Worker.publish conn newGreetings $ Greeting "Hello1"
+    Worker.publish conn newGreetings $ Greeting "Hello2"
 
+    -- Each worker will receive one of the messages
+    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "one" >> print (value m)
+    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "two" >> print (value m)
 
+    putStrLn "Press any key to exit"
+    _ <- getLine
+    return ()
 
+-- | You can bind to messages dynamically with wildcards in Binding Keys
+dynamic :: Connection -> IO ()
+dynamic conn = do
+    -- \| anyGreetings matches `greetings.*`
+    q <- Worker.queue conn def anyGreetings
 
-    onMessage :: Connection -> Message TestMessage -> IO ()
-    onMessage conn m = do
-      let testMessage = value m
-      putStrLn "Got Message"
-      print testMessage
-      Worker.publish conn results (greeting testMessage)
+    -- You can only publish to a Routing Key. Publishing to anyGreetings will give a compile error
+    Worker.publish conn newGreetings $ Greeting "Hello"
 
+    -- This queue listens for anything under `greetings.`
+    Worker.worker conn def q onError $ \m -> putStrLn "Got: " >> print (value m)
 
-    onError :: WorkerException SomeException -> IO ()
-    onError e = do
-      putStrLn "Do something with errors"
-      print e
+onError :: WorkerException SomeException -> IO ()
+onError e = do
+    putStrLn "Do something with errors"
+    print e
 
+test :: (Connection -> IO ()) -> IO ()
+test action = do
+    hSetBuffering stdout LineBuffering
+    hSetBuffering stderr LineBuffering
+    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    action conn
 
+main :: IO ()
+main = example
 
-    main :: IO ()
-    main = do
-      hSetBuffering stdout LineBuffering
-      hSetBuffering stderr LineBuffering
-      example
+```
