@@ -7,18 +7,10 @@ import Control.Concurrent (forkIO)
 import Control.Monad.Catch (SomeException)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Function ((&))
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.AMQP.Worker
-    ( Connection
-    , Message (..)
-    , WorkerException
-    , def
-    , fromURI
-    , queueName
-    )
 import qualified Network.AMQP.Worker as Worker
-import Network.AMQP.Worker.Key
 import System.IO
     ( BufferMode (..)
     , hSetBuffering
@@ -33,68 +25,94 @@ newtype TestMessage = TestMessage
 instance FromJSON TestMessage
 instance ToJSON TestMessage
 
-newMessages :: Key TestMessage
+newMessages :: Key Routing TestMessage
 newMessages = key "messages" & word "new"
 
-anyMessages :: Key TestMessage
-anyMessages = key "messages" & star
-
-results :: Key Text
-results = key "results"
+anyMessages :: Key Binding TestMessage
+anyMessages = key "messages" & any1
 
 example :: IO ()
 example = do
-    -- connect
     conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    simple conn
 
-    -- TODO: document what happens when you use the same name
-    -- TODO: document how to create fanouts vs single-consumer
-    -- vs load balancing. This supports all use-cases I can think of
+publishing :: Connection -> IO ()
+publishing conn = do
+    Worker.publish conn newMessages $ TestMessage "Hello"
 
-    msgq1 <- Worker.queue conn "msg1" newMessages
-    msgq2 <- Worker.queue conn "msg2" newMessages
+-- | Create a queue to process messages
+simple :: Connection -> IO ()
+simple conn = do
+    -- create a queue to receive them
+    q <- Worker.queue conn def newMessages
 
-    -- queues with the same name are equivalent
+    -- publish a message (delivered to queue)
+    Worker.publish conn newMessages $ TestMessage "Hello"
 
-    -- This queue listens for anything under `messages.`
-    anyq <- Worker.queue conn def anyMessages
-    resq <- Worker.queue conn def results
+    -- We cannot publish to anyMessages because it is a binding key (with wildcards in it)
+    -- Worker.publish conn anyMessages $ TestMessage "Compiler Error"
 
-    putStrLn "Enter a message"
-    msg <- getLine
+    -- Loop and print any values received
+    Worker.worker conn def q onError (print . value)
 
-    -- publish a message
-    putStrLn "Publishing a message"
-    Worker.publish conn newMessages (TestMessage $ pack msg)
+-- | Multiple queues with distinct names will each get copies of published messages
+multiple :: Connection -> IO ()
+multiple conn = do
+    -- create two separate queues
+    one <- Worker.queue conn "one" newMessages
+    two <- Worker.queue conn "two" newMessages
 
-    -- Can I make it so you CAN'T define queues with the same name?
-    -- we can't just check
-    _ <- forkIO $ Worker.worker conn def msgq1 onError (onMessage "msg1" conn)
-    _ <- forkIO $ Worker.worker conn def msgq2 onError (onMessage "msg2" conn)
-    _ <- forkIO $ Worker.worker conn def anyq onError (onMessage "any" conn)
-    _ <- forkIO $ Worker.worker conn def resq onError onResults
+    -- publish a message (delivered to both)
+    Worker.publish conn newMessages $ TestMessage "Hello"
+
+    -- Each of these workers will receive the same message
+    _ <- forkIO $ Worker.worker conn def one onError $ \m -> putStrLn "one" >> print (value m)
+    _ <- forkIO $ Worker.worker conn def two onError $ \m -> putStrLn "two" >> print (value m)
 
     putStrLn "Press any key to exit"
     _ <- getLine
     return ()
 
-onMessage :: String -> Connection -> Message TestMessage -> IO ()
-onMessage name conn m = do
-    let testMessage = value m
-    putStrLn $ name <> " << " <> show testMessage
-    Worker.publish conn results (greeting testMessage)
+-- | Create multiple workers on the same queue to load balance between them
+balance :: Connection -> IO ()
+balance conn = do
+    -- create a single queue
+    q <- Worker.queue conn def newMessages
 
-onResults :: Message Text -> IO ()
-onResults m = do
-    putStrLn $ "res << " <> show (value m)
+    -- publish two messages
+    Worker.publish conn newMessages $ TestMessage "Hello1"
+    Worker.publish conn newMessages $ TestMessage "Hello2"
+
+    -- Each worker will receive one of the messages
+    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "one" >> print (value m)
+    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "two" >> print (value m)
+
+    putStrLn "Press any key to exit"
+    _ <- getLine
+    return ()
+
+-- | You can bind to messages dynamically with wildcards in Binding Keys
+dynamic :: Connection -> IO ()
+dynamic conn = do
+    -- \| anyMessages matches `messages.*`
+    q <- Worker.queue conn def anyMessages
+
+    Worker.publish conn newMessages $ TestMessage "Hello"
+
+    -- This queue listens for anything under `messages.`
+    Worker.worker conn def q onError $ \m -> putStrLn "Got: " >> print (value m)
 
 onError :: WorkerException SomeException -> IO ()
 onError e = do
     putStrLn "Do something with errors"
     print e
 
-main :: IO ()
-main = do
+test :: (Connection -> IO ()) -> IO ()
+test action = do
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
-    example
+    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    action conn
+
+main :: IO ()
+main = example

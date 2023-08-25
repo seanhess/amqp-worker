@@ -91,12 +91,14 @@
 -- >
 -- >
 module Network.AMQP.Worker
-    ( -- * Routing Keys
+    ( -- * Binding and Routing Keys
       Key (..)
+    , Binding
+    , Routing
     , word
     , key
-    , star
-    , hash
+    , any1
+    , many
 
       -- * Connecting
     , Connection

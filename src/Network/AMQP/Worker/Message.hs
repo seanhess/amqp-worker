@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Network.AMQP.Worker.Message where
 
@@ -10,7 +11,7 @@ import Data.ByteString.Lazy (ByteString)
 import Network.AMQP (Ack (..), DeliveryMode (..), newMsg)
 import qualified Network.AMQP as AMQP
 import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
-import Network.AMQP.Worker.Key (Key, keyText)
+import Network.AMQP.Worker.Key (Key, RequireRouting, Routing, keyText)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Queue (Queue (..))
 
@@ -41,7 +42,7 @@ jsonMessage a =
 -- | publish a message to a routing key, without making sure a queue exists to handle it or if it is the right type of message body
 --
 -- > publishToExchange conn key (User "username")
-publishToExchange :: (ToJSON a, MonadIO m) => Connection -> Key a -> a -> m ()
+publishToExchange :: (RequireRouting a, ToJSON msg, MonadIO m) => Connection -> Key a msg -> msg -> m ()
 publishToExchange conn rk msg =
     liftIO $ withChannel conn $ \chan -> do
         _ <- AMQP.publishMsg chan (exchange conn) (keyText rk) (jsonMessage msg)
@@ -50,7 +51,7 @@ publishToExchange conn rk msg =
 -- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
 -- > publish conn (key "users" :: Key Routing User) (User "username")
-publish :: (ToJSON a, MonadIO m) => Connection -> Key a -> a -> m ()
+publish :: (RequireRouting a, ToJSON msg, MonadIO m) => Connection -> Key a msg -> msg -> m ()
 publish = publishToExchange
 
 -- | Check for a message once and attempt to parse it

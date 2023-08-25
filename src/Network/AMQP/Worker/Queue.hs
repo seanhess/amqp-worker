@@ -11,7 +11,7 @@ import Network.AMQP (ExchangeOpts (..), QueueOpts)
 import qualified Network.AMQP as AMQP
 
 import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
-import Network.AMQP.Worker.Key (Key (..), keyText)
+import Network.AMQP.Worker.Key (Binding, Key (..), keyText, toBindingKey)
 
 type QueueName = Text
 
@@ -23,36 +23,33 @@ instance Default QueuePrefix where
 
 -- | A queue is an inbox for messages to be delivered
 data Queue msg
-    = Queue (Key msg) QueueName
+    = Queue (Key Binding msg) QueueName
     deriving (Show, Eq)
 
--- | Create a queue and bind it, allowing it to receive messages. Each unique
--- key name bound to that key will receive a copy of the message. Use default naming scheme
-queue :: (MonadIO m) => Connection -> QueuePrefix -> Key msg -> m (Queue msg)
+-- | Create a queue to receive messages matching the 'Key' with a name prefixed
+-- via `queueName`
+queue :: (MonadIO m) => Connection -> QueuePrefix -> Key a msg -> m (Queue msg)
 queue conn pre key = do
     queueNamed conn (queueName pre key) key
 
--- | Create a queue, using the routing key as a name. Duplicate queue names refer
--- to the same queue and workers bound to each will load balance, consuming each
--- message only once.
---
--- If you want to receive a message twice, call `queue` with unique names
-queueNamed :: (MonadIO m) => Connection -> QueueName -> Key msg -> m (Queue msg)
+-- | Create a queue to receive messages matching the binding key. Each queue with a unique name
+-- will be delivered a separate copy of the messsage. Workers operating on the same queue,
+-- or on queues with the same name will load balance
+queueNamed :: (MonadIO m) => Connection -> QueueName -> Key a msg -> m (Queue msg)
 queueNamed conn name key = do
-    let q = Queue key name
+    let q = Queue (toBindingKey key) name
     bindQueue conn q
     return q
 
--- queueNamed :: (MonadIO m) => Connection -> Key msg -> m (Queue msg)
--- queueNamed conn key = queue conn (queueName "main" key) key
-
--- | Name a queue with a prefix and the routing key name. Useful for seeing at
+-- | Name a queue with a prefix and the binding key name. Useful for seeing at
 -- a glance which queues are receiving which messages
-queueName :: QueuePrefix -> Key msg -> QueueName
+-- > -- "main messages.new"
+-- > queueName "main" (key "messages" & word "new")
+queueName :: QueuePrefix -> Key a msg -> QueueName
 queueName (QueuePrefix pre) key = pre <> " " <> keyText key
 
 -- | Queues must be bound before you publish messages to them, or the messages will not be saved.
--- Use `queue` or `queue'` instead
+-- Use `queue` or `queueNamed` instead
 bindQueue :: (MonadIO m) => Connection -> Queue msg -> m ()
 bindQueue conn (Queue key name) =
     liftIO $ withChannel conn $ \chan -> do
