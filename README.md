@@ -26,10 +26,10 @@ newtype Greeting = Greeting
 instance FromJSON Greeting
 instance ToJSON Greeting
 
-newGreetings :: Key Routing Greeting
+newGreetings :: Key Bind Greeting
 newGreetings = key "greetings" & word "new"
 
-anyGreetings :: Key Binding Greeting
+anyGreetings :: Key Bind Greeting
 anyGreetings = key "greetings" & any1
 
 example :: IO ()

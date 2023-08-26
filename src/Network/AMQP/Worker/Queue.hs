@@ -11,7 +11,7 @@ import Network.AMQP (ExchangeOpts (..), QueueOpts)
 import qualified Network.AMQP as AMQP
 
 import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
-import Network.AMQP.Worker.Key (Binding, Key (..), keyText, toBindingKey)
+import Network.AMQP.Worker.Key (Bind, Key (..), keyText, toBindKey)
 
 type QueueName = Text
 
@@ -23,7 +23,7 @@ instance Default QueuePrefix where
 
 -- | A queue is an inbox for messages to be delivered
 data Queue msg
-    = Queue (Key Binding msg) QueueName
+    = Queue (Key Bind msg) QueueName
     deriving (Show, Eq)
 
 -- | Create a queue to receive messages matching the 'Key' with a name prefixed via `queueName`.
@@ -39,7 +39,7 @@ queue conn pre key = do
 -- or on queues with the same name will load balance
 queueNamed :: (MonadIO m) => Connection -> QueueName -> Key a msg -> m (Queue msg)
 queueNamed conn name key = do
-    let q = Queue (toBindingKey key) name
+    let q = Queue (toBindKey key) name
     bindQueue conn q
     return q
 
