@@ -1,25 +1,21 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.AMQP.Worker.Queue where
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Default (Default (..))
 import Data.String (IsString)
 import Data.Text (Text)
 import Network.AMQP (ExchangeOpts (..), QueueOpts)
 import qualified Network.AMQP as AMQP
 
-import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
+import Network.AMQP.Worker.Connection (Connection (..), withChannel)
 import Network.AMQP.Worker.Key (Bind, Key (..), keyText, toBindKey)
 
 type QueueName = Text
 
-newtype QueuePrefix = QueuePrefix Text
-    deriving (Show, Eq, IsString)
-
-instance Default QueuePrefix where
-    def = QueuePrefix "main"
+type QueuePrefix = Text
 
 -- | A queue is an inbox for messages to be delivered
 data Queue msg
@@ -35,8 +31,8 @@ queue conn pre key = do
     queueNamed conn (queueName pre key) key
 
 -- | Create a queue to receive messages matching the binding key. Each queue with a unique name
--- will be delivered a separate copy of the messsage. Workers operating on the same queue,
--- or on queues with the same name will load balance
+-- will be delivered a separate copy of the messsage. Workers will load balance if operating on the
+-- same queue, or on queues with the same name
 queueNamed :: (MonadIO m) => Connection -> QueueName -> Key a msg -> m (Queue msg)
 queueNamed conn name key = do
     let q = Queue (toBindKey key) name
@@ -49,7 +45,7 @@ queueNamed conn name key = do
 -- > -- "main messages.new"
 -- > queueName "main" (key "messages" & word "new")
 queueName :: QueuePrefix -> Key a msg -> QueueName
-queueName (QueuePrefix pre) key = pre <> " " <> keyText key
+queueName pre key = pre <> " " <> keyText key
 
 -- | Queues must be bound before you publish messages to them, or the messages will not be saved.
 -- Use `queue` or `queueNamed` instead
@@ -57,7 +53,7 @@ bindQueue :: (MonadIO m) => Connection -> Queue msg -> m ()
 bindQueue conn (Queue key name) =
     liftIO $ withChannel conn $ \chan -> do
         let options = AMQP.newQueue{AMQP.queueName = name}
-        let exg = AMQP.newExchange{exchangeName = exchange conn, exchangeType = "topic"}
+        let exg = AMQP.newExchange{exchangeName = conn.exchange, exchangeType = "topic"}
         _ <- AMQP.declareExchange chan exg
         _ <- AMQP.declareQueue chan options
         _ <- AMQP.bindQueue chan name (exchange conn) (keyText key)

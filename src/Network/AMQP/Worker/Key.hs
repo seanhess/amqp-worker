@@ -61,21 +61,36 @@ keyText :: Key a msg -> Text
 keyText (Key ns) =
     Text.intercalate "." . List.map fromBind $ ns
 
+-- | Start a new routing key (can also be used for bindings)
+--
+-- > key "messages"
+-- > -- matches "messages"
+key :: Text -> Key Route msg
+key t = Key [Word t]
+
+-- | A specific word. Can be used to chain Routing keys or Binding keys
+--
+-- > key "messages" & word "new"
+-- > -- matches "messages.new"
+word :: Text -> Key a msg -> Key a msg
+word w (Key ws) = Key $ ws ++ [toBind w]
+
 -- | Match any one word. Equivalent to `*`. Converts to a Binding key and can no longer be used to publish messaages
+--
+-- > key "messages" & any1
+-- > -- matches "messages.new"
+-- > -- matches "messages.update"
 any1 :: Key a msg -> Key Bind msg
 any1 (Key ws) = Key (ws ++ [Any])
 
 -- | Match zero or more words. Equivalient to `#`. Converts to a Binding key and can no longer be used to publish messages
+--
+-- > key "messages" & many
+-- > -- matches "messages"
+-- > -- matches "messages.new"
+-- > -- matches "messages.1234.update"
 many :: Key a msg -> Key Bind msg
 many (Key ws) = Key (ws ++ [Many])
-
--- | A specific word. Can be used to chain Routing keys or Binding keys
-word :: Text -> Key a msg -> Key a msg
-word w (Key ws) = Key $ ws ++ [toBind w]
-
--- | Start a new routing key (can also be used for bindings)
-key :: Text -> Key Route msg
-key t = Key [Word t]
 
 -- | We can convert Route Keys to Bind Keys safely, as they are usable for both publishing and binding
 toBindKey :: Key a msg -> Key Bind msg

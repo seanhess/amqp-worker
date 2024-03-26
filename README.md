@@ -1,7 +1,9 @@
 AMQP Worker
 -----------
 
-Type-safe AMQP workers. Compatible with RabbitMQ
+Type-safe and simplified message queues with AMQP. Compatible with RabbitMQ.
+
+[View on Hackage](https://hackage.haskell.org/package/amqp-worker)
 
 ```haskell
 {-# LANGUAGE DeriveGeneric #-}
@@ -10,14 +12,12 @@ Type-safe AMQP workers. Compatible with RabbitMQ
 module Main where
 
 import Control.Concurrent (forkIO)
-import Control.Monad.Catch (SomeException)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Function ((&))
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Network.AMQP.Worker
 import qualified Network.AMQP.Worker as Worker
-import System.IO (BufferMode (..), hSetBuffering, stderr, stdout)
 
 newtype Greeting = Greeting
     {message :: Text}
@@ -26,7 +26,7 @@ newtype Greeting = Greeting
 instance FromJSON Greeting
 instance ToJSON Greeting
 
-newGreetings :: Key Bind Greeting
+newGreetings :: Key Route Greeting
 newGreetings = key "greetings" & word "new"
 
 anyGreetings :: Key Bind Greeting
@@ -45,16 +45,14 @@ publishing conn = do
 simple :: Connection -> IO ()
 simple conn = do
     -- create a queue to receive them
-    q <- Worker.queue conn def newGreetings
+    q <- Worker.queue conn "main" newGreetings
 
     -- publish a message (delivered to queue)
     Worker.publish conn newGreetings $ Greeting "Hello"
 
-    -- We cannot publish to anyGreetings because it is a binding key (with wildcards in it)
-    -- Worker.publish conn anyGreetings $ TestMessage "Compiler Error"
-
-    -- Loop and print any values received
-    Worker.worker conn def q onError (print . value)
+    -- wait until we receive the message
+    m <- Worker.takeMessage conn q
+    print (value m)
 
 -- | Multiple queues with distinct names will each get copies of published messages
 multiple :: Connection -> IO ()
@@ -66,27 +64,33 @@ multiple conn = do
     -- publish a message (delivered to both)
     Worker.publish conn newGreetings $ Greeting "Hello"
 
-    -- Each of these workers will receive the same message
-    _ <- forkIO $ Worker.worker conn def one onError $ \m -> putStrLn "one" >> print (value m)
-    _ <- forkIO $ Worker.worker conn def two onError $ \m -> putStrLn "two" >> print (value m)
+    -- Each of these queues will receive the same message
+    m1 <- Worker.takeMessage conn one
+    m2 <- Worker.takeMessage conn two
 
-    putStrLn "Press any key to exit"
-    _ <- getLine
-    return ()
+    print $ value m1
+    print $ value m2
 
--- | Create multiple workers on the same queue to load balance between them
-balance :: Connection -> IO ()
-balance conn = do
+-- | Create workers to continually process messages
+workers :: Connection -> IO ()
+workers conn = do
     -- create a single queue
-    q <- Worker.queue conn def newGreetings
+    q <- Worker.queue conn "main" newGreetings
 
-    -- publish two messages
+    -- publish some messages
     Worker.publish conn newGreetings $ Greeting "Hello1"
     Worker.publish conn newGreetings $ Greeting "Hello2"
+    Worker.publish conn newGreetings $ Greeting "Hello3"
 
-    -- Each worker will receive one of the messages
-    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "one" >> print (value m)
-    _ <- forkIO $ Worker.worker conn def q onError $ \m -> putStrLn "two" >> print (value m)
+    -- Create a worker to process any messages on the queue
+    _ <- forkIO $ Worker.worker conn q $ \m -> do
+        putStrLn "one"
+        print (value m)
+
+    -- Listening to the same queue with N workers will load balance them
+    _ <- forkIO $ Worker.worker conn q $ \m -> do
+        putStrLn "two"
+        print (value m)
 
     putStrLn "Press any key to exit"
     _ <- getLine
@@ -95,28 +99,15 @@ balance conn = do
 -- | You can bind to messages dynamically with wildcards in Binding Keys
 dynamic :: Connection -> IO ()
 dynamic conn = do
-    -- \| anyGreetings matches `greetings.*`
-    q <- Worker.queue conn def anyGreetings
+    -- anyGreetings matches `greetings.*`
+    q <- Worker.queue conn "main" anyGreetings
 
-    -- You can only publish to a Routing Key. Publishing to anyGreetings will give a compile error
+    -- You can only publish to a specific Routing Key, like `greetings.new`
     Worker.publish conn newGreetings $ Greeting "Hello"
 
-    -- This queue listens for anything under `greetings.`
-    Worker.worker conn def q onError $ \m -> putStrLn "Got: " >> print (value m)
+    -- We cannot publish to anyGreetings because it is a Binding Key (with wildcards in it)
+    -- Worker.publish conn anyGreetings $ Greeting "Compiler Error"
 
-onError :: WorkerException SomeException -> IO ()
-onError e = do
-    putStrLn "Do something with errors"
-    print e
-
-test :: (Connection -> IO ()) -> IO ()
-test action = do
-    hSetBuffering stdout LineBuffering
-    hSetBuffering stderr LineBuffering
-    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
-    action conn
-
-main :: IO ()
-main = example
-
+    m <- Worker.takeMessage conn q
+    print $ value m
 ```

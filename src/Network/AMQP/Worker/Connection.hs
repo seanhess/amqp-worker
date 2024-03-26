@@ -1,13 +1,19 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Network.AMQP.Worker.Connection
-    ( Connection (..)
-    , AMQP.ConnectionOpts (..)
-    , AMQP.defaultConnectionOpts
-    , connect
+    ( connect
+    , connect'
     , disconnect
     , withChannel
+    , Connection (..)
+    , WorkerOpts (..)
+    , ExchangeName
+    , AMQP.ConnectionOpts (..)
+    , AMQP.defaultConnectionOpts
+    , AMQP.fromURI
     ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar, takeMVar)
@@ -28,14 +34,32 @@ data Connection = Connection
     , exchange :: ExchangeName
     }
 
--- | Connect to the AMQP server.
+data WorkerOpts = WorkerOpts
+    { exchange :: ExchangeName
+    -- ^ Everything goes on one exchange
+    , openTime :: Double
+    -- ^ Number of seconds connections in the pool remain open for re-use
+    , maxChannels :: Int
+    -- ^ Number of concurrent connectinos available in the pool
+    , numStripes :: Maybe Int
+    }
+    deriving (Show, Eq)
+
+-- | Connect to the AMQP server using simple defaults
 --
 -- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
 connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
-connect opts = liftIO $ do
-    -- use a default exchange name
-    let exchangeName = "amq.topic"
+connect opts =
+    connect' opts $
+        WorkerOpts
+            { exchange = "amq.topic"
+            , openTime = 10
+            , maxChannels = 8
+            , numStripes = Just 1
+            }
 
+connect' :: MonadIO m => AMQP.ConnectionOpts -> WorkerOpts -> m Connection
+connect' copt wopt = liftIO $ do
     -- create a single connection in an mvar
     cvar <- newEmptyMVar
     openConnection cvar
@@ -43,21 +67,15 @@ connect opts = liftIO $ do
     -- open a shared pool for channels
     chans <- Pool.newPool (config cvar)
 
-    pure $ Connection cvar chans exchangeName
+    pure $ Connection cvar chans wopt.exchange
   where
     config cvar =
-        Pool.defaultPoolConfig (create cvar) destroy openTime maxChans
-            & Pool.setNumStripes (Just 1)
-
-    openTime :: Double
-    openTime = 10
-
-    maxChans :: Int
-    maxChans = 8
+        Pool.defaultPoolConfig (create cvar) destroy wopt.openTime wopt.maxChannels
+            & Pool.setNumStripes wopt.numStripes
 
     openConnection cvar = do
         -- open a connection and store in the mvar
-        conn <- AMQP.openConnection'' opts
+        conn <- AMQP.openConnection'' copt
         putMVar cvar conn
 
     reopenConnection cvar = do
@@ -67,9 +85,9 @@ connect opts = liftIO $ do
 
     create cvar = do
         conn <- readMVar cvar
-        chan <- catch (AMQP.openChannel conn) (createEx cvar)
-        return chan
+        catch (AMQP.openChannel conn) (createEx cvar)
 
+    -- Reopen closed connections
     createEx cvar (ConnectionClosedException _ _) = do
         reopenConnection cvar
         create cvar

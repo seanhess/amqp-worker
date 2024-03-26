@@ -38,7 +38,7 @@ publishing conn = do
 simple :: Connection -> IO ()
 simple conn = do
     -- create a queue to receive them
-    q <- Worker.queue conn def newGreetings
+    q <- Worker.queue conn "main" newGreetings
 
     -- publish a message (delivered to queue)
     Worker.publish conn newGreetings $ Greeting "Hello"
@@ -68,7 +68,7 @@ multiple conn = do
 workers :: Connection -> IO ()
 workers conn = do
     -- create a single queue
-    q <- Worker.queue conn def newGreetings
+    q <- Worker.queue conn "main" newGreetings
 
     -- publish some messages
     Worker.publish conn newGreetings $ Greeting "Hello1"
@@ -93,7 +93,7 @@ workers conn = do
 dynamic :: Connection -> IO ()
 dynamic conn = do
     -- anyGreetings matches `greetings.*`
-    q <- Worker.queue conn def anyGreetings
+    q <- Worker.queue conn "main" anyGreetings
 
     -- You can only publish to a specific Routing Key, like `greetings.new`
     Worker.publish conn newGreetings $ Greeting "Hello"

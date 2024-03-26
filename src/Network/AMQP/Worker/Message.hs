@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -13,7 +14,7 @@ import qualified Data.Aeson as Aeson
 import Data.ByteString.Lazy (ByteString)
 import Network.AMQP (Ack (..), DeliveryMode (..), newMsg)
 import qualified Network.AMQP as AMQP
-import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
+import Network.AMQP.Worker.Connection (Connection (..), withChannel)
 import Network.AMQP.Worker.Key (Key, RequireRoute, Route, keyText)
 import Network.AMQP.Worker.Poll (poll)
 import Network.AMQP.Worker.Queue (Queue (..))
@@ -27,7 +28,7 @@ data Message a = Message
 
 -- | send a message to a queue. Enforces that the message type and queue name are correct at the type level
 --
--- > let newUsers = key "users" & word "new":: Key Route User
+-- > let newUsers = key "users" & word "new" :: Key Route User
 -- > publish conn newUsers (User "username")
 --
 -- Publishing to a Binding Key results in an error
@@ -44,7 +45,7 @@ publish = publishToExchange
 publishToExchange :: (RequireRoute a, ToJSON msg, MonadIO m) => Connection -> Key a msg -> msg -> m ()
 publishToExchange conn rk msg =
     liftIO $ withChannel conn $ \chan -> do
-        _ <- AMQP.publishMsg chan (exchange conn) (keyText rk) (jsonMessage msg)
+        _ <- AMQP.publishMsg chan conn.exchange (keyText rk) (jsonMessage msg)
         return ()
   where
     jsonMessage :: ToJSON a => a -> AMQP.Message
@@ -56,7 +57,7 @@ publishToExchange conn rk msg =
             , AMQP.msgDeliveryMode = Just Persistent
             }
 
--- \| Wait until a message is read from the queue. Throws an exception if the message doesn't match the declared type
+-- | Wait until a message is read from the queue. Throws an exception if the incoming message doesn't match the key type
 --
 -- > m <- Worker.takeMessage conn queue
 -- > print (value m)
@@ -68,7 +69,8 @@ takeMessage conn q = do
         Error e -> liftIO $ throwIO e
         Parsed msg -> pure msg
 
--- | Create a worker which loops and handles messages
+-- | Create a worker which loops and handles messages. Throws an exception if the incoming message doesn't match the key type.
+-- It is recommended that you catch errors in your handler and allow message parsing errors to crash your program.
 --
 -- > Worker.worker conn queue $ \m -> do
 -- >   print (value m)

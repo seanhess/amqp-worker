@@ -9,24 +9,24 @@
 -- Stability:   experimental
 -- Portability: portable
 --
--- Type safe and simplified message queues with AMQP
+-- Type safe and simplified message queues with AMQP. Compatible with RabbitMQ
 module Network.AMQP.Worker
     ( -- * How to use this library
       -- $use
 
-      -- * Binding and Routing Keys
-      Key (..)
-    , Bind
-    , Route
-    , word
-    , key
-    , any1
-    , many
-
       -- * Connecting
-    , connect
+      connect
     , AMQP.fromURI
     , Connection
+
+      -- * Binding and Routing Keys
+    , Key (..)
+    , Bind
+    , Route
+    , key
+    , word
+    , any1
+    , many
 
       -- * Sending Messages
     , publish
@@ -40,16 +40,14 @@ module Network.AMQP.Worker
     , QueuePrefix (..)
 
       -- * Messages
+    , takeMessage
     , ParseError (..)
     , Message (..)
-    , takeMessage
 
       -- * Worker
     , worker
-    , Default.def
     ) where
 
-import qualified Data.Default as Default
 import qualified Network.AMQP as AMQP
 
 import Network.AMQP.Worker.Connection
@@ -86,8 +84,8 @@ import Network.AMQP.Worker.Queue
 --
 -- Define dynamic Routing Keys to receive many kinds of messages
 --
--- > let newMessages = key "messages" & any1 & word "new"
--- > q <- Worker.queue conn def newMessages :: IO (Queue Greeting)
+-- > let anyMessages = key "messages" & any1
+-- > q <- Worker.queue conn "main" anyMessages
 -- > m <- Worker.takeMessage conn q
 -- > print (value m)
 --

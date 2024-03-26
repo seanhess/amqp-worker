@@ -20,7 +20,6 @@ dependencies:
   - amqp >=0.20 && <1
   - bytestring >=0.11 && <0.12
   - exceptions >=0.10 && <0.11
-  - data-default >=0.7 && <0.8
   - monad-loops >=0.4 && <0.5
   - mtl >=2.2 && <2.3
   - resource-pool >=0.3 && <0.5
