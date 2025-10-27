@@ -26,6 +26,7 @@ module Network.AMQP.Worker
       -- * Connecting
     , connect
     , AMQP.fromURI
+    , parseURI
     , Connection
 
       -- * Sending Messages
@@ -70,12 +71,12 @@ import Network.AMQP.Worker.Queue
 -- > instance FromJSON Greeting
 -- > instance ToJSON Greeting
 -- >
--- > newGreetings :: Key Routing Greeting
+-- > newGreetings :: Key Route Greeting
 -- > newGreetings = key "greetings" & word "new"
 --
 -- Connect to AMQP and publish a message
 --
--- > conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+-- > conn <- Worker.connect =<< parseURI "amqp://guest:guest@localhost:5672"
 -- > Worker.publish conn newGreetings $ Greeting "hello"
 --
 -- Create a queue to receive messages. You can bind direclty to the Routing Key to ensure it is delivered once

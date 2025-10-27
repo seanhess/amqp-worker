@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -5,13 +6,16 @@ module Network.AMQP.Worker.Connection
     ( Connection (..)
     , AMQP.ConnectionOpts (..)
     , AMQP.defaultConnectionOpts
+    , ExchangeName
     , connect
     , disconnect
     , withChannel
+    , parseURI
+    , AMQP.fromURI
     ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, readMVar, takeMVar)
-import Control.Monad.Catch (catch, throwM)
+import Control.Monad.Catch (Exception, MonadThrow, catch, throwM)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Function ((&))
 import Data.Pool (Pool)
@@ -28,10 +32,20 @@ data Connection = Connection
     , exchange :: ExchangeName
     }
 
+type URLString = String
+data ConnectionError = InvalidConnectionURL URLString String
+    deriving (Show, Exception)
+
+parseURI :: (MonadThrow m) => URLString -> m AMQP.ConnectionOpts
+parseURI u =
+    case AMQP.fromURI u of
+        Left err -> throwM $ InvalidConnectionURL u err
+        Right a -> pure a
+
 -- | Connect to the AMQP server.
 --
--- > conn <- connect (fromURI "amqp://guest:guest@localhost:5672")
-connect :: MonadIO m => AMQP.ConnectionOpts -> m Connection
+-- > conn <- connect =<< parseURI "amqp://guest:guest@localhost:5672"
+connect :: (MonadIO m) => AMQP.ConnectionOpts -> m Connection
 connect opts = liftIO $ do
     -- use a default exchange name
     let exchangeName = "amq.topic"
@@ -78,7 +92,7 @@ connect opts = liftIO $ do
     destroy chan = do
         AMQP.closeChannel chan
 
-disconnect :: MonadIO m => Connection -> m ()
+disconnect :: (MonadIO m) => Connection -> m ()
 disconnect c = liftIO $ do
     conn <- readMVar $ amqpConn c
     Pool.destroyAllResources $ pool c

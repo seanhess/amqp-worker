@@ -5,7 +5,7 @@ cabal-version: 1.12
 -- see: https://github.com/sol/hpack
 
 name:           amqp-worker
-version:        2.0.1
+version:        2.1.0
 synopsis:       Type-safe AMQP workers
 description:    Please see the README on GitHub at <https://github.com/seanhess/amqp-worker#readme>
 category:       Network
@@ -39,7 +39,7 @@ library
       src
   build-depends:
       aeson >=2.0 && <2.3
-    , amqp >=0.20 && <1
+    , amqp >=0.24 && <1
     , base >=4.9 && <5
     , bytestring >=0.11 && <0.13
     , data-default >=0.7 && <0.9
@@ -59,7 +59,7 @@ executable example
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
       aeson >=2.0 && <2.3
-    , amqp >=0.20 && <1
+    , amqp >=0.24 && <1
     , amqp-worker
     , base >=4.9 && <5
     , bytestring >=0.11 && <0.13
@@ -81,7 +81,7 @@ test-suite test
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
       aeson >=2.0 && <2.3
-    , amqp >=0.20 && <1
+    , amqp >=0.24 && <1
     , amqp-worker
     , base >=4.9 && <5
     , bytestring >=0.11 && <0.13

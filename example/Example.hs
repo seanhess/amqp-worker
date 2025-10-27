@@ -27,7 +27,7 @@ anyGreetings = key "greetings" & any1
 
 example :: IO ()
 example = do
-    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    conn <- Worker.connect =<< parseURI "amqp://guest:guest@localhost:5672"
     simple conn
 
 publishing :: Connection -> IO ()
@@ -108,7 +108,7 @@ test :: (Connection -> IO ()) -> IO ()
 test action = do
     hSetBuffering stdout LineBuffering
     hSetBuffering stderr LineBuffering
-    conn <- Worker.connect (fromURI "amqp://guest:guest@localhost:5672")
+    conn <- Worker.connect =<< parseURI "amqp://guest:guest@localhost:5672"
     action conn
 
 main :: IO ()

@@ -47,7 +47,7 @@ publishToExchange conn rk msg =
         _ <- AMQP.publishMsg chan (exchange conn) (keyText rk) (jsonMessage msg)
         return ()
   where
-    jsonMessage :: ToJSON a => a -> AMQP.Message
+    jsonMessage :: (ToJSON a) => a -> AMQP.Message
     jsonMessage a =
         newMsg
             { AMQP.msgBody = Aeson.encode a
