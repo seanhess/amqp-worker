@@ -10,6 +10,7 @@ import Data.Text (Text)
 import Network.AMQP (ExchangeOpts (..), QueueOpts)
 import qualified Network.AMQP as AMQP
 
+import Network.AMQP.Types (FieldTable (..))
 import Network.AMQP.Worker.Connection (Connection, exchange, withChannel)
 import Network.AMQP.Worker.Key (Bind, Key (..), keyText, toBindKey)
 
@@ -54,11 +55,16 @@ queueName (QueuePrefix pre) key = pre <> " " <> keyText key
 -- | Queues must be bound before you publish messages to them, or the messages will not be saved.
 -- Use `queue` or `queueNamed` instead
 bindQueue :: (MonadIO m) => Connection -> Queue msg -> m ()
-bindQueue conn (Queue key name) =
+bindQueue conn (Queue key name) = do
+    let options = AMQP.newQueue{AMQP.queueName = name}
+    let exg = AMQP.newExchange{exchangeName = exchange conn, exchangeType = "topic"}
+    bindQueue' conn exg options key (FieldTable mempty)
+
+-- | Bind a queue passing arbitrary arguments to AMQP. Prefer using bindQueue for good defaults
+bindQueue' :: (MonadIO m) => Connection -> ExchangeOpts -> QueueOpts -> Key a msg -> FieldTable -> m ()
+bindQueue' conn exg q key args =
     liftIO $ withChannel conn $ \chan -> do
-        let options = AMQP.newQueue{AMQP.queueName = name}
-        let exg = AMQP.newExchange{exchangeName = exchange conn, exchangeType = "topic"}
         _ <- AMQP.declareExchange chan exg
-        _ <- AMQP.declareQueue chan options
-        _ <- AMQP.bindQueue chan name (exchange conn) (keyText key)
+        _ <- AMQP.declareQueue chan q
+        _ <- AMQP.bindQueue' chan (AMQP.queueName q) (exchange conn) (keyText key) args
         return ()
